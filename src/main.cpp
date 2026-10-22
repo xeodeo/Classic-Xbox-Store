@@ -656,10 +656,13 @@ void drawHeader(const Ui& ui)
 // Boton del mando: circulo pequeño de color con la letra, y lo que hace.
 float hint(float x, float y, const char* button, unsigned long color, const char* action)
 {
+    // Un circulo para A, B, X, Y; una pastilla mas ancha para "Back" o "Start".
     const float cy = y + Gfx::lineHeight(Gfx::kBody) / 2;
-    Gfx::roundRect(x, cy - 8, 16, 16, 8, color, Gfx::mix(color, 0xFF000000, 0.35f));
-    Gfx::textCenter(Gfx::kSmall, button, x + 8, cy - Gfx::lineHeight(Gfx::kSmall) / 2, 0xFFFFFFFF);
-    return x + 22 + Gfx::text(Gfx::kBody, action, x + 22, y, kText) + 16;
+    const float textW = Gfx::textWidth(Gfx::kSmall, button);
+    const float w = textW + 10 > 16 ? textW + 10 : 16;
+    Gfx::roundRect(x, cy - 8, w, 16, 8, color, Gfx::mix(color, 0xFF000000, 0.35f));
+    Gfx::textCenter(Gfx::kSmall, button, x + w / 2, cy - Gfx::lineHeight(Gfx::kSmall) / 2, 0xFFFFFFFF);
+    return x + w + 6 + Gfx::text(Gfx::kBody, action, x + w + 6, y, kText) + 16;
 }
 
 void drawFooter(const Ui& ui, const char* left)
@@ -672,10 +675,10 @@ void drawFooter(const Ui& ui, const char* left)
 
     float x = ui.view == View::Store ? 150 : 196;
     if (ui.view == View::Network) {
-        x = 110;
+        x = 96;
         x = hint(x, y, "A", 0xFF3FB53F, "probar");
         x = hint(x, y, "Y", 0xFFE0B419, "buscar proxy");
-        x = hint(x, y, "<", 0xFF707070, Settings::proxyOn() ? "quitar proxy" : "usar proxy");
+        x = hint(x, y, "Back", 0xFF707070, Settings::proxyOn() ? "quitar proxy" : "usar proxy");
         hint(x, y, "X", 0xFF2F6FD0, "volver");
         return;
     } else if (ui.view == View::Account) {
