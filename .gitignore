@@ -22,3 +22,6 @@ cxs_resume.bin
 
 # Notas de trabajo internas
 buzon/
+
+# Los genera el bundler del XDK en cada compilacion
+assets/icon/*.h
