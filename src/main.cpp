@@ -385,6 +385,7 @@ struct Ui {
     std::string loginEmail;
     Keyboard keyboard;
     char launchError[96] = "";    // si un juego no arranco
+    bool proxyPanel = false;      // Red: panel de proxies en vez del diagnostico
     char toast[96] = "";          // aviso corto en pantalla (unos segundos)
     DWORD toastUntil = 0;
     int installedRowScroll = 0;   // Instalados: desplazamiento en filas (con los titulos)
@@ -676,11 +677,17 @@ void drawFooter(const Ui& ui, const char* left)
     Gfx::text(Gfx::kBody, fitted, kMargin, y, kText);
 
     float x = ui.view == View::Store ? 150 : 196;
-    if (ui.view == View::Network) {
-        x = 96;
+    if (ui.view == View::Network && ui.proxyPanel) {
+        x = 110;
+        if (Route::state() != Route::State::Searching) x = hint(x, y, "A", 0xFF3FB53F, "buscar");
+        if (Settings::proxyCount() > 0)
+            x = hint(x, y, "Y", 0xFFE0B419, Settings::proxyOn() ? "desactivar" : "activar");
+        hint(x, y, "B", 0xFFD03A3A, "volver");
+        return;
+    } else if (ui.view == View::Network) {
+        x = 110;
         x = hint(x, y, "A", 0xFF3FB53F, "probar");
-        x = hint(x, y, "Y", 0xFFE0B419, "buscar");
-        x = hint(x, y, "Back", 0xFF707070, Settings::proxyOn() ? "quitar proxies" : "usar proxies");
+        x = hint(x, y, "Y", 0xFFE0B419, "proxies");
         hint(x, y, "X", 0xFF2F6FD0, "volver");
         return;
     } else if (ui.view == View::Account) {
@@ -900,12 +907,29 @@ float drawRoute()
 {
     const float textY = (kRowHeight - Gfx::lineHeight(Gfx::kBody)) / 2;
     const float top = kListTopInstalled;
-    Gfx::text(Gfx::kLabel, "Buscar proxy", kMargin + 8, top + textY, kText);
+    Gfx::text(Gfx::kLabel, "Proxies", kMargin + 8, top + textY, kText);
     drawProxyStatus(top + textY + 2);
+    float y = top + kRowHeight + 4;
+    if (Route::state() == Route::State::Idle) {
+        // Sin buscar todavia en esta sesion: la lista guardada.
+        if (Settings::proxyCount() == 0) {
+            Gfx::text(Gfx::kBody, "No hay proxies guardados. Pulsa A para buscar.", kMargin + 8, y + textY, kTextDim);
+            return y + kRowHeight + 8;
+        }
+        for (int i = 0; i < Settings::proxyCount(); ++i, y += kRowHeight) {
+            Gfx::text(Gfx::kBody, Settings::proxyAt(i), kMargin + 8, y + textY, kTextList);
+            Gfx::textRight(Gfx::kBody, i == 0 ? "guardado (el mejor)" : "guardado", Gfx::kWidth - kMargin - 8,
+                           y + textY, Settings::proxyOn() ? kGreen : kTextDim);
+        }
+        Gfx::text(Gfx::kSmall,
+                  Settings::proxyOn() ? "Activos: la mitad de las conexiones va por ellos y, si uno falla, sigue directa."
+                                      : "Desactivados: todo va directo.",
+                  kMargin + 8, y + 4, kTextDim);
+        return y + 26;
+    }
     Route::Result results[Route::kMaxResults];
     char message[160];
     const int count = Route::results(results, message, sizeof(message));
-    float y = top + kRowHeight + 4;
     for (int i = 0; i < count; ++i, y += kRowHeight) {
         Gfx::text(Gfx::kBody, results[i].label, kMargin + 8, y + textY, kTextList);
         char speed[48];
@@ -1229,9 +1253,9 @@ void draw(Ui& ui, DWORD now)
         _snprintf(left, sizeof(left), "Cuenta");
     } else {
         chooseArt(ui, nullptr, now);
-        const float below = Route::state() != Route::State::Idle ? drawRoute() : drawProbes();
+        const float below = ui.proxyPanel ? drawRoute() : drawProbes();
         drawRecentLog(below);
-        _snprintf(left, sizeof(left), "Red");
+        _snprintf(left, sizeof(left), ui.proxyPanel ? "Proxies" : "Red");
     }
     left[sizeof(left) - 1] = 0;
     if (Log::crashText()[0]) _snprintf(left, sizeof(left), "%s", Log::crashText());
@@ -1416,12 +1440,12 @@ void __cdecl main()
                 _snprintf(ui.launchError, sizeof(ui.launchError), "No se pudo abrir %s", g.name);
                 Log::write("abrir: fallo (%lu)", GetLastError());
             }
-        } else if (ui.view == View::Network) {
-            if (pressed & kA) startTest();
-            if (pressed & kY) Route::startSearch();
-            if (pressed & kBack) {
+        } else if (ui.view == View::Network && ui.proxyPanel) {
+            // Proxies: todo lo del proxy en un sitio (buscar, activar, desactivar).
+            if ((pressed & kA) && Route::state() != Route::State::Searching) Route::startSearch();
+            if (pressed & kY) {
                 if (Settings::proxyCount() == 0) {
-                    _snprintf(ui.toast, sizeof(ui.toast), "No hay proxies guardados: pulsa Y para buscar");
+                    _snprintf(ui.toast, sizeof(ui.toast), "No hay proxies guardados: pulsa A para buscar");
                 } else {
                     Settings::setProxyOn(!Settings::proxyOn());
                     _snprintf(ui.toast, sizeof(ui.toast), Settings::proxyOn() ? "Proxies activados (%d)"
@@ -1430,7 +1454,13 @@ void __cdecl main()
                 }
                 ui.toastUntil = now + 3000;
             }
-            pressed &= ~(kY | kBack);
+            if (pressed & kB) ui.proxyPanel = false;
+            if (pressed & kX) ui.proxyPanel = false;   // X tambien sale de Red (abajo)
+            pressed &= ~(kA | kY | kB);
+        } else if (ui.view == View::Network) {
+            if (pressed & kA) startTest();
+            if (pressed & kY) ui.proxyPanel = true;
+            pressed &= ~kY;
         }
 
         if (pressed & kY) {
