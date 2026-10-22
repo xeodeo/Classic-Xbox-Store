@@ -850,12 +850,10 @@ DWORD WINAPI fetchWorker(void* param)
     // directas. Se suman las rutas, y si los proxies caen solo se pierde la mitad.
     const int proxyCount = static_cast<int>(f.proxies.size());
     int proxy = -1;   // indice en la lista, o -1 = directa
-    int proxiesTried = 0;
     if (proxyCount > 0 && index % 2 == 0) {
         proxy = (index / 2) % proxyCount;
         client.setProxy(f.proxies[proxy].c_str());
     }
-    int proxyFailures = 0;
     while (!f.stop && !s_cancel) {
         long long segment = -1;
         {
@@ -877,22 +875,11 @@ DWORD WINAPI fetchWorker(void* param)
         for (int attempt = 0; ok && !f.stop && !s_cancel;) {
             if (client.fetch(f.url.c_str(), f.headers.c_str(), start, length, buffer, error, sizeof(error))) break;
             if (proxy >= 0) {
-                Log::write("instalar: trozo %I64d por el proxy %s: %s", segment, f.proxies[proxy].c_str(), error);
-                if (++proxyFailures >= 2) {
-                    // Este proxy no sirve: el siguiente de la lista; si ya se probaron
-                    // todos, directa.
-                    proxyFailures = 0;
-                    if (++proxiesTried < proxyCount) {
-                        proxy = (proxy + 1) % proxyCount;
-                        client.setProxy(f.proxies[proxy].c_str());
-                        Log::write("instalar: conexion %d pasa al proxy %s", index, f.proxies[proxy].c_str());
-                    } else {
-                        proxy = -1;
-                        client.setProxy("");
-                        Log::write("instalar: conexion %d: ningun proxy sirve, sigue directa", index);
-                    }
-                }
-                for (int i = 0; i < 5 && !f.stop && !s_cancel; ++i) Sleep(100);
+                // El proxy fallo: esta conexion sigue directa (no se arriesga con otro).
+                Log::write("instalar: trozo %I64d por el proxy %s: %s; la conexion %d sigue directa", segment,
+                           f.proxies[proxy].c_str(), error, index);
+                proxy = -1;
+                client.setProxy("");
                 continue;
             }
             ++attempt;
