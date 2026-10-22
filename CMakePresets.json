@@ -1,0 +1,34 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "xbox",
+      "displayName": "Classic Xbox Store (Xbox original)",
+      "description": "VS2022 cl.exe (C++17) + enlazador e imagebld del XDK 5849. XBOX_XDK_ROOT apunta a la carpeta 'xbox' del XDK.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/xbox",
+      "toolchainFile": "${sourceDir}/cmake/xbox_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/scripts/ninja.exe"
+      }
+    }
+    ,{
+      "name": "xbox-autotest",
+      "displayName": "Prueba automatica en xemu",
+      "inherits": "xbox",
+      "binaryDir": "${sourceDir}/build/xbox-autotest",
+      "cacheVariables": { "STORE_AUTOTEST": "ON" }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "xbox-autotest",
+      "configurePreset": "xbox-autotest"
+    },
+    {
+      "name": "xbox",
+      "configurePreset": "xbox"
+    }
+  ]
+}

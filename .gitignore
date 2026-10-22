@@ -1,0 +1,24 @@
+# Compilacion y salida
+build/
+bin/
+bin-autotest/
+
+# Nada del XDK ni enlazado con el: no se sube nunca
+*.xbe
+*.iso
+*.map
+*.lib
+*.xpr
+*.exe
+# Herramientas libres que hacen falta para compilar (no llevan nada del XDK)
+!scripts/ninja.exe
+!scripts/extract-xiso.exe
+
+# Datos de una consola o de un usuario
+ia_session.json
+cxs_log.txt
+cxs_config.txt
+cxs_resume.bin
+
+# Notas de trabajo internas
+buzon/

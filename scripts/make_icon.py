@@ -1,0 +1,379 @@
+"""
+make_icon.py - Icon generator for Classic Xbox Store.
+
+Generates the complete set of icons for Classic Xbox Store:
+- assets/icon/icon_1024.png   (1024x1024 RGB PNG master)
+- assets/icon/cover.png       (256x256 RGB PNG - default.tbn for XBMC/UnleashX)
+- assets/icon/titleimage.bmp  (128x128 24-bit RGB BMP without alpha - XBE Title Image)
+- assets/icon/saveimage.bmp   (64x64 24-bit RGB BMP without alpha - Save Game Image)
+- assets/icon/app_icon.ico    (Multi-resolution ICO: 16, 32, 48, 64, 128, 256)
+- assets/icon/preview.png     (Preview inspection sheet: 256, 128, 64 on dark gray)
+- assets/icon/icon.svg        (Master vector source)
+"""
+
+import os
+import sys
+import subprocess
+import tempfile
+import struct
+from PIL import Image, ImageEnhance, ImageFilter, ImageDraw, ImageFont
+
+# Find root directory
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(ROOT_DIR, "assets", "icon")
+
+# Vector geometry for S in STORE:
+# Crafted to match the exact chamfer angles, stroke weight (6.6), and squircle
+# grammar of the 2001 Xbox wordmark (letters X, B, O, X).
+S_PATH = (
+    "M 33 9.0 V 6.5 L 26.5 0 H 6.5 L 0 6.5 V 12.0 L 6.5 14.5 H 24.0 "
+    "L 33 17.0 V 18.2 L 26.5 24.7 H 6.5 L 0 18.2 V 15.7 H 6.6 V 18.1 "
+    "L 9.0 19.5 H 24.0 L 26.4 18.1 V 17.0 L 20.0 10.0 H 6.6 V 6.6 "
+    "L 9.0 5.2 H 24.0 L 26.4 6.6 V 9.0 Z"
+)
+
+# Complete 1024x1024 Master SVG Artwork
+SVG_SOURCE = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Background Cosmic Ambient Radiance -->
+    <radialGradient id="bgAmbient" cx="50%" cy="30%" r="48%">
+      <stop offset="0%" stop-color="#143e0e" stop-opacity="0.85"/>
+      <stop offset="42%" stop-color="#051504" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Emerald Halo behind Jewel -->
+    <radialGradient id="jewelHalo" cx="50%" cy="30%" r="35%">
+      <stop offset="0%" stop-color="#55db1b" stop-opacity="0.4"/>
+      <stop offset="45%" stop-color="#2a8c08" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Original Xbox 3D X Facet Gradients -->
+    <linearGradient id="a" gradientUnits="userSpaceOnUse" x1="46.861" y1="91.84" x2="89.075" y2="49.626">
+      <stop offset=".17" stop-color="#c9ca4c"/>
+      <stop offset=".418" stop-color="#c8c94c"/>
+      <stop offset=".578" stop-color="#c2c74d"/>
+      <stop offset=".713" stop-color="#b9c350"/>
+      <stop offset=".834" stop-color="#abbd52"/>
+      <stop offset=".944" stop-color="#9ab656"/>
+      <stop offset="1" stop-color="#90b258"/>
+    </linearGradient>
+
+    <linearGradient id="b" gradientUnits="userSpaceOnUse" x1="99.192" y1="49.682" x2="141.224" y2="91.714">
+      <stop offset="0" stop-color="#637e3e"/>
+      <stop offset=".077" stop-color="#78974a"/>
+      <stop offset=".151" stop-color="#89ab54"/>
+      <stop offset=".192" stop-color="#90b258"/>
+      <stop offset=".197" stop-color="#93b357"/>
+      <stop offset=".229" stop-color="#a3ba54"/>
+      <stop offset=".266" stop-color="#b2c051"/>
+      <stop offset=".309" stop-color="#bdc54f"/>
+      <stop offset=".362" stop-color="#c4c84d"/>
+      <stop offset=".437" stop-color="#c8ca4c"/>
+      <stop offset=".644" stop-color="#c9ca4c"/>
+    </linearGradient>
+
+    <linearGradient id="c" gradientUnits="userSpaceOnUse" x1="95.597" y1="80.681" x2="139.121" y2="124.205">
+      <stop offset="0" stop-color="#66813f"/>
+      <stop offset=".226" stop-color="#90b258"/>
+      <stop offset=".259" stop-color="#96b457"/>
+      <stop offset=".379" stop-color="#a8bc53"/>
+      <stop offset=".507" stop-color="#b7c250"/>
+      <stop offset=".644" stop-color="#c1c74e"/>
+      <stop offset=".798" stop-color="#c8c94c"/>
+      <stop offset="1" stop-color="#c9ca4c"/>
+    </linearGradient>
+
+    <linearGradient id="d" gradientUnits="userSpaceOnUse" x1="93.008" y1="81.041" x2="49.484" y2="124.565">
+      <stop offset="0" stop-color="#577036"/>
+      <stop offset=".271" stop-color="#90b258"/>
+      <stop offset=".316" stop-color="#9ab656"/>
+      <stop offset=".409" stop-color="#abbd53"/>
+      <stop offset=".511" stop-color="#b9c350"/>
+      <stop offset=".623" stop-color="#c2c74d"/>
+      <stop offset=".756" stop-color="#c8c94c"/>
+      <stop offset=".961" stop-color="#c9ca4c"/>
+    </linearGradient>
+
+    <linearGradient id="e" gradientUnits="userSpaceOnUse" x1="44.61" y1="41.834" x2="77.689" y2="41.834">
+      <stop offset="0" stop-color="#839363"/>
+      <stop offset=".234" stop-color="#707e57"/>
+      <stop offset=".575" stop-color="#586346"/>
+      <stop offset=".842" stop-color="#475039"/>
+      <stop offset="1" stop-color="#404934"/>
+    </linearGradient>
+
+    <linearGradient id="f" gradientUnits="userSpaceOnUse" x1="94.157" y1="42.836" x2="136.326" y2="42.836">
+      <stop offset="0" stop-color="#49503d"/>
+      <stop offset="1" stop-color="#78875b"/>
+    </linearGradient>
+
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="108.454" y1="92.878" x2="156.773" y2="92.878">
+      <stop offset="0" stop-color="#434a39"/>
+      <stop offset=".165" stop-color="#4b533f"/>
+      <stop offset=".46" stop-color="#5e684d"/>
+      <stop offset=".847" stop-color="#78865d"/>
+      <stop offset="1" stop-color="#839363"/>
+    </linearGradient>
+
+    <linearGradient id="h" gradientUnits="userSpaceOnUse" x1="24.454" y1="93.351" x2="70.418" y2="93.351">
+      <stop offset="0" stop-color="#739148"/>
+      <stop offset="1" stop-color="#64724c"/>
+    </linearGradient>
+
+    <radialGradient id="i" cx="94.217" cy="76.235" r="106.617" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".012" stop-color="#f4f5f5"/>
+      <stop offset=".122" stop-color="#b6b8ba"/>
+      <stop offset=".226" stop-color="#86888a"/>
+      <stop offset=".32" stop-color="#636466"/>
+      <stop offset=".402" stop-color="#464547"/>
+      <stop offset=".47" stop-color="#212122"/>
+      <stop offset=".514" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="j" cx="94.342" cy="76.197" r="108.175" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".25" stop-color="#87888b"/>
+      <stop offset=".441" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Typography Gradient: High-Vibrancy Xbox Lime -->
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d8ff60"/>
+      <stop offset="30%" stop-color="#b5f242"/>
+      <stop offset="70%" stop-color="#8ec730"/>
+      <stop offset="100%" stop-color="#6ca01e"/>
+    </linearGradient>
+
+    <!-- Underline Ambient Glow Bar -->
+    <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#55db1b" stop-opacity="0"/>
+      <stop offset="25%" stop-color="#55db1b" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#d8ff60" stop-opacity="1"/>
+      <stop offset="75%" stop-color="#55db1b" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#55db1b" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep pitch black background -->
+  <rect width="1024" height="1024" fill="#000000"/>
+
+  <!-- Cosmic ambient glow -->
+  <circle cx="512" cy="305" r="470" fill="url(#bgAmbient)"/>
+  <circle cx="512" cy="305" r="320" fill="url(#jewelHalo)"/>
+
+  <!-- 3D Beveled Xbox X & Spherical Jewel -->
+  <!-- Scaled 5.2x, centered horizontally at 512, vertically at 310 -->
+  <g transform="translate(512, 310) scale(5.2) translate(-95.4, -73.0)">
+    <!-- Main Facets -->
+    <path d="M94.247 55.859l-42.54-19.882v59.646l42.54-.154v-39.61z" fill="url(#a)"/>
+    <path d="M136.4 35.978L94.223 55.859v39.765H136.4V35.978z" fill="url(#b)"/>
+    <path d="M143.662 118.728v-5.239l-34.987-44.697v49.937h34.987z" fill="url(#c)"/>
+    <path d="M79.992 119.024V69.088l-34.987 44.697v5.239h34.987z" fill="url(#d)"/>
+
+    <!-- Outer Bevels -->
+    <path d="M42.229 27.809l7.167 6.628c10.327 7.552 25.277 14.641 44.852 21.423v-3.7L42.229 27.809z" fill="url(#e)"/>
+    <path d="M136.4 35.978l5.086-6.165L94.21 52.152l.01 3.707c20.654-8.478 34.705-15.105 42.18-19.881z" fill="url(#f)"/>
+    <path d="M108.518 64.325l.153 4.855c11.251 16.184 23.351 31.674 36.143 46.547l12.023 5.703-48.319-57.105z" fill="url(#g)"/>
+    <path d="M79.983 69.423l.077-5.009-45.774 57.874 8.554-5.165c10.48-9.939 22.887-25.814 37.143-47.7z" fill="url(#h)"/>
+
+    <!-- Radial Sphere Highlights -->
+    <path d="M127.769 91.154c8.786 11.328 18.727 22.272 30.054 32.905l-1.694-110.2c-24.121 26.433-39.996 43.311-47.625 50.476 7.861 11.406 14.255 20.346 19.265 26.819z" fill="url(#i)"/>
+    <path d="M128.743 37.596c10.634-5.396 17.416-10.635 20.499-15.489l-58.06-6.896-54.685 4.813c4.778 6.551 13.178 12.871 25.2 18.804 4.546 2.312 9.941 4.701 16.336 7.243 2.544 1.003 8.015 3.161 16.184 6.319 15.105-5.778 26.588-10.633 34.526-14.794z" fill="url(#j)"/>
+
+    <!-- Black Negative Space Cutouts -->
+    <path d="M33.444 12.473h-3.777l.309 112.435c6.165-4.545 13.332-11.713 21.654-21.576 9.324-11.021 18.726-23.968 28.437-38.917l-13.871-13.41c-5.009-5.01-9.248-9.248-12.562-12.947-7.398-7.938-14.103-16.493-20.19-25.585z" fill="#000000"/>
+    <path d="M18.307 129.67v4.777H172.51v-3.469c-11.868-6.78-22.271-13.1-31.21-18.88-17.186-11.328-32.906-23.196-47.086-35.758-13.948 13.796-29.438 26.048-46.623 36.761-7.86 4.933-17.031 10.095-27.589 15.721l-1.695.848z" fill="#000000"/>
+  </g>
+
+  <!-- Typography Block: XBOX STORE -->
+
+  <!-- Row 1: XBOX -->
+  <g fill="url(#brandGrad)" transform="translate(278, 672) scale(3.3)">
+    <!-- X1 -->
+    <path d="M15.29 12.35 l15.23-12.35 h-6.72 l-11.87 9.66 -11.93-9.66 h-6.6 l15.17 12.35 -15.17 12.35 h6.6 l11.93-9.71 11.87 9.71 h6.72 l-15.23-12.35z"/>
+    <!-- B (x = 36.5) -->
+    <g transform="translate(36.5, 0)">
+      <path d="M34.84 13.38 v-2.04 l1.8-.96 c-.42-4.62-1.8-8.09-4.14-10.38 H8.1 c-2.34 2.22-3.78 5.7-4.14 10.31 H0 v4.08 h3.96 c.36 4.62 1.8 8.03 4.14 10.31 h24.4 c2.34-2.34 3.72-5.76 4.14-10.31 l-1.8-1.01zm-4.56-9.3 a17.58 17.58 0 0 1 2.22 6.24 H8.1 c.36-2.34 1.08-4.38 2.22-6.24 h19.96zm2.22 10.32 a17.87 17.87 0 0 1-2.22 6.3 H10.32 c-1.14-1.86-1.86-3.96-2.22-6.3 h22.18z"/>
+    </g>
+    <!-- O (x = 78.5) -->
+    <g transform="translate(78.5, 0)">
+      <path d="M32.92 12.35 c0-5.52-1.44-9.6-4.2-12.35 H4.32 C1.44 2.76 0 6.84 0 12.35 s1.44 9.6 4.32 12.35 h24.4 c2.76-2.76 4.2-6.9 4.2-12.35zm-4.08 0 c0 1.86-.42 3.78-1.2 5.76 l-1.14 2.58 H6.48 l-1.14-2.58 c-.84-1.98-1.2-3.9-1.2-5.76 0-2.94.78-5.7 2.34-8.28 h20.03 c1.56 2.58 2.34 5.34 2.34 8.28z"/>
+    </g>
+    <!-- X2 (x = 117.5) -->
+    <g transform="translate(117.5, 0)">
+      <path d="M15.29 12.35 l15.23-12.35 h-6.72 l-11.87 9.66 -11.93-9.66 h-6.6 l15.17 12.35 -15.17 12.35 h6.6 l11.93-9.71 11.87 9.71 h6.72 l-15.23-12.35z"/>
+    </g>
+  </g>
+
+  <!-- Row 2: STORE -->
+  <g fill="url(#brandGrad)" transform="translate(278, 775) scale(2.37)">
+    <!-- S -->
+    <path d="{S_PATH}"/>
+
+    <!-- T (x = 39) -->
+    <g transform="translate(39, 0)">
+      <path d="M0 4.5 L4.5 0 h23.0 l4.5 4.5 v3.0 h-12.7 v17.2 h-6.6 V7.5 H0 z"/>
+    </g>
+
+    <!-- O (x = 77) with downward download chevron inside -->
+    <g transform="translate(77, 0)">
+      <path d="M32.92 12.35 c0-5.52-1.44-9.6-4.2-12.35 H4.32 C1.44 2.76 0 6.84 0 12.35 s1.44 9.6 4.32 12.35 h24.4 c2.76-2.76 4.2-6.9 4.2-12.35zm-4.08 0 c0 1.86-.42 3.78-1.2 5.76 l-1.14 2.58 H6.48 l-1.14-2.58 c-.84-1.98-1.2-3.9-1.2-5.76 0-2.94.78-5.7 2.34-8.28 h20.03 c1.56 2.58 2.34 5.34 2.34 8.28z"/>
+      <!-- Download Arrow glyph inside O -->
+      <polygon points="16.46,18.0 22.0,12.5 18.2,12.5 18.2,7.2 14.72,7.2 14.72,12.5 10.92,12.5" fill="#efffa6"/>
+    </g>
+
+    <!-- R (x = 116) -->
+    <g transform="translate(116, 0)">
+      <path d="M 0 0 H 25.5 L 32.5 7.0 V 8.5 L 26.5 14.5 H 18.0 L 32.5 24.7 H 23.5 L 11.5 14.5 H 6.6 V 24.7 H 0 Z M 6.6 5.5 V 9.5 H 22.0 L 24.5 7.5 L 22.0 5.5 Z"/>
+    </g>
+
+    <!-- E (x = 155) -->
+    <g transform="translate(155, 0)">
+      <path d="M0 0 h26.5 l4.5 4.5 v2.5 H6.6 v4.2 h18.0 v5.5 H6.6 v4.0 h24.4 l-4.5 4.0 H0 z"/>
+    </g>
+  </g>
+
+  <!-- Luminous High-Tech Base Accent Bar -->
+  <line x1="260" y1="870" x2="764" y2="870" stroke="url(#accentLine)" stroke-width="4.5" stroke-linecap="round"/>
+</svg>
+"""
+
+def find_edge_path():
+    candidates = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
+def render_svg_to_png(svg_string, out_png_path, width=1024, height=1024):
+    edge_exe = find_edge_path()
+    if not edge_exe:
+        raise RuntimeError("Microsoft Edge not found. Please install Edge or configure browser path.")
+
+    with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False, encoding="utf-8") as f:
+        f.write(svg_string)
+        tmp_svg = f.name
+
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        cmd = [
+            edge_exe,
+            "--headless=new",
+            "--disable-gpu",
+            f"--user-data-dir={tmp_dir}",
+            f"--screenshot={out_png_path}",
+            f"--window-size={width},{height}",
+            tmp_svg
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0 or not os.path.exists(out_png_path):
+            raise RuntimeError(f"Edge headless failed: {res.stderr}")
+    finally:
+        try:
+            os.remove(tmp_svg)
+        except Exception:
+            pass
+
+def verify_bmp_24bit(bmp_path):
+    with open(bmp_path, "rb") as f:
+        data = f.read(30)
+    if data[:2] != b"BM":
+        raise ValueError(f"{bmp_path} is not a valid BMP file")
+    bpp = struct.unpack("<H", data[28:30])[0]
+    return bpp
+
+def main():
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    print(f"Generating Classic Xbox Store icons in: {OUTPUT_DIR}")
+
+    # 1. Save Vector SVG
+    svg_file = os.path.join(OUTPUT_DIR, "icon.svg")
+    with open(svg_file, "w", encoding="utf-8") as f:
+        f.write(SVG_SOURCE)
+    print(f"[1/7] Saved vector source: {svg_file}")
+
+    # 2. Render Master 1024x1024 PNG
+    icon_1024_path = os.path.join(OUTPUT_DIR, "icon_1024.png")
+    render_svg_to_png(SVG_SOURCE, icon_1024_path, 1024, 1024)
+    # Ensure RGB mode (no alpha)
+    im1024 = Image.open(icon_1024_path).convert("RGB")
+    im1024.save(icon_1024_path, format="PNG")
+    print(f"[2/7] Rendered master 1024x1024 RGB PNG: {icon_1024_path}")
+
+    # 3. Generate cover.png (256x256 RGB PNG)
+    cover_path = os.path.join(OUTPUT_DIR, "cover.png")
+    im256 = im1024.resize((256, 256), Image.Resampling.LANCZOS)
+    im256.save(cover_path, format="PNG")
+    print(f"[3/7] Generated cover.png (256x256 RGB): {cover_path}")
+
+    # 4. Generate titleimage.bmp (128x128 24-bit BMP without alpha)
+    title_path = os.path.join(OUTPUT_DIR, "titleimage.bmp")
+    im128 = im1024.resize((128, 128), Image.Resampling.LANCZOS)
+    # Adaptive sharpening for small screen legibility
+    im128_sharp = ImageEnhance.Sharpness(im128).enhance(1.45)
+    im128_sharp.convert("RGB").save(title_path, format="BMP")
+    bpp_title = verify_bmp_24bit(title_path)
+    print(f"[4/7] Generated titleimage.bmp (128x128, {bpp_title}-bit BMP): {title_path}")
+
+    # 5. Generate saveimage.bmp (64x64 24-bit BMP without alpha)
+    save_path = os.path.join(OUTPUT_DIR, "saveimage.bmp")
+    im64 = im1024.resize((64, 64), Image.Resampling.LANCZOS)
+    im64_sharp = ImageEnhance.Sharpness(im64).enhance(1.65)
+    im64_sharp.convert("RGB").save(save_path, format="BMP")
+    bpp_save = verify_bmp_24bit(save_path)
+    print(f"[5/7] Generated saveimage.bmp (64x64, {bpp_save}-bit BMP): {save_path}")
+
+    # 6. Generate app_icon.ico (multi-resolution: 16, 32, 48, 64, 128, 256)
+    ico_path = os.path.join(OUTPUT_DIR, "app_icon.ico")
+    ico_sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+    # Save multi-size ICO
+    im256.save(ico_path, format="ICO", sizes=ico_sizes)
+    ico_check = Image.open(ico_path)
+    actual_ico_sizes = getattr(ico_check, "info", {}).get("sizes", set())
+    print(f"[6/7] Generated app_icon.ico with sizes {actual_ico_sizes}: {ico_path}")
+
+    # 7. Generate preview.png (~900x320 PNG sheet)
+    preview_path = os.path.join(OUTPUT_DIR, "preview.png")
+    sheet_w, sheet_h = 900, 320
+    sheet = Image.new("RGB", (sheet_w, sheet_h), (24, 24, 27))
+
+    # Paste versions side-by-side
+    # 256x256 at (32, 36)
+    sheet.paste(im256, (32, 36))
+    # 128x128 at (336, 100)
+    sheet.paste(im128_sharp, (336, 100))
+    # 64x64 at (512, 132)
+    sheet.paste(im64_sharp, (512, 132))
+
+    # Add descriptive typography labels
+    draw = ImageDraw.Draw(sheet)
+    font_path = os.path.join(ROOT_DIR, "assets", "fonts", "OpenSans-Semibold.ttf")
+    if os.path.exists(font_path):
+        font_lbl = ImageFont.truetype(font_path, 13)
+        font_dim = ImageFont.truetype(font_path, 11)
+    else:
+        font_lbl = ImageFont.load_default()
+        font_dim = ImageFont.load_default()
+
+    draw.text((32, 16), "256x256  Cover (XBMC / UnleashX)", fill=(200, 200, 200), font=font_lbl)
+    draw.text((32, 296), "PNG RGB  256x256 px", fill=(110, 110, 115), font=font_dim)
+
+    draw.text((336, 78), "128x128  TitleImage", fill=(200, 200, 200), font=font_lbl)
+    draw.text((336, 234), "BMP 24-bit  128x128 px", fill=(110, 110, 115), font=font_dim)
+
+    draw.text((512, 110), "64x64  SaveImage", fill=(200, 200, 200), font=font_lbl)
+    draw.text((512, 202), "BMP 24-bit  64x64 px", fill=(110, 110, 115), font=font_dim)
+
+    sheet.save(preview_path, format="PNG")
+    print(f"[7/7] Generated preview.png ({sheet_w}x{sheet_h}): {preview_path}")
+
+    print("\n--- ALL ICONS GENERATED AND VERIFIED SUCCESSFULLY ---")
+
+if __name__ == "__main__":
+    main()
