@@ -32,6 +32,10 @@ const int kMaxGames = 512;
 // XAPI solo monta D:, T:, U: y Z:. Esto enlaza E:, F: y G: a sus particiones.
 void mount();
 
+// Apunta D: a una carpeta ("F:\\Games\\Halo 2") para lanzar su default.xbe:
+// XLaunchNewImage solo admite rutas dentro de D:. Falso si la unidad no es E, F o G.
+bool mapDTo(const char* folder);
+
 // Lee el espacio de cada unidad y busca juegos. Tarda un poco (recorre FATX).
 void scan();
 

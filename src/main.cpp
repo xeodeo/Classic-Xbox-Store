@@ -1444,10 +1444,21 @@ void __cdecl main()
                 Gfx::textCenter(Gfx::kBody, tr("Abriendo..."), Gfx::kWidth / 2.0f, 250, kTextDim);
                 Gfx::endFrame();
                 Gfx::persist();
-                XLaunchNewImage(xbe, NULL);
-                // Solo se llega aqui si no arranco.
+                // XLaunchNewImage solo admite rutas en D:: se apunta D: a la carpeta del
+                // juego (como hacen los paneles) y se lanza su default.xbe.
+                char folder[160];
+                _snprintf(folder, sizeof(folder), "%s\\%s", g.folder, g.name);
+                folder[sizeof(folder) - 1] = 0;
+                if (Drives::mapDTo(folder)) {
+                    const DWORD result = XLaunchNewImage("D:\\default.xbe", NULL);
+                    Log::write("abrir: fallo al lanzar D:\\default.xbe (%lu)", result);
+                    Drives::mapDTo(nullptr);
+                } else {
+                    Log::write("abrir: no se pudo apuntar D: a %s", folder);
+                }
+                // Solo se llega aqui si no arranco. D: vuelve a la carpeta de la tienda.
+                Drives::mount();
                 _snprintf(ui.launchError, sizeof(ui.launchError), tr("No se pudo abrir %s"), g.name);
-                Log::write("abrir: fallo (%lu)", GetLastError());
             }
         } else if (ui.view == View::Network && ui.proxyPanel) {
             // Proxies: todo lo del proxy en un sitio (buscar, activar, desactivar).

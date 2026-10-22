@@ -2,6 +2,7 @@
 
 #include "XboxXtl.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -148,6 +149,26 @@ void sortGames()
 
 namespace Drives
 {
+bool mapDTo(const char* folder)
+{
+    if (!folder || !folder[0] || folder[1] != ':') return false;
+    const char* device = nullptr;
+    for (int i = 0; i < kDriveCount; ++i)
+        if (kPartitions[i].letter == toupper(static_cast<unsigned char>(folder[0]))) device = kPartitions[i].device;
+    if (!device) return false;
+    // "F:\Games\Halo 2" -> "\Device\Harddisk0\Partition6\Games\Halo 2"
+    char target[260];
+    _snprintf(target, sizeof(target), "%s%s", device, folder + 2);
+    target[sizeof(target) - 1] = 0;
+    size_t length = strlen(target);
+    while (length > 0 && target[length - 1] == '\\') target[--length] = 0;
+    char linkName[] = "\\??\\D:";
+    KernelString link = {static_cast<USHORT>(sizeof(linkName) - 1), static_cast<USHORT>(sizeof(linkName)), linkName};
+    KernelString dest = {static_cast<USHORT>(length), static_cast<USHORT>(sizeof(target)), target};
+    IoDeleteSymbolicLink(&link);
+    return IoCreateSymbolicLink(&link, &dest) >= 0;
+}
+
 void mount()
 {
     for (int i = 0; i < kDriveCount; ++i)
