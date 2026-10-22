@@ -385,6 +385,8 @@ struct Ui {
     std::string loginEmail;
     Keyboard keyboard;
     char launchError[96] = "";    // si un juego no arranco
+    char toast[96] = "";          // aviso corto en pantalla (unos segundos)
+    DWORD toastUntil = 0;
     int installedRowScroll = 0;   // Instalados: desplazamiento en filas (con los titulos)
 
     // Copia del catalogo de la letra actual.
@@ -1235,6 +1237,13 @@ void draw(Ui& ui, DWORD now)
     if (Log::crashText()[0]) _snprintf(left, sizeof(left), "%s", Log::crashText());
     drawFooter(ui, left);
     if (ui.view == View::Account) drawAccount(ui);   // encima del pie: el teclado tapa la pantalla
+    if (ui.toast[0] && static_cast<long>(ui.toastUntil - now) > 0) {
+        // Aviso centrado encima del pie.
+        const float w = Gfx::textWidth(Gfx::kBody, ui.toast) + 32;
+        const float x = (Gfx::kWidth - w) / 2, y = kRuleBottom - 44;
+        Gfx::roundRect(x, y, w, 32, 16, 0xF0204A26, 0xF0102814);
+        Gfx::textCenter(Gfx::kBody, ui.toast, Gfx::kWidth / 2.0f, y + (32 - Gfx::lineHeight(Gfx::kBody)) / 2, kText);
+    }
     if (ui.confirm) drawConfirm(ui);
     if (ui.resumePrompt) drawResumePrompt(ui);
     Gfx::endFrame();
@@ -1273,6 +1282,17 @@ void __cdecl main()
         previous = held;
 
         const Installer::Progress progress = Installer::progress();
+        // Proxies activos y la lista tiene horas: renovarla en segundo plano (nunca
+        // durante una descarga, para no quitarle red). Se mira cada minuto.
+        static DWORD proxyCheckAt = 0;
+        if (g_drivesReady && now - proxyCheckAt > 60000 && progress.phase == Installer::Phase::Idle &&
+            Route::state() != Route::State::Searching) {
+            proxyCheckAt = now;
+            if (Settings::proxySearchDue()) {
+                Log::write("ruta: la lista de proxies tiene horas; la renuevo");
+                Route::startSearch();
+            }
+        }
         // Al arrancar (con los discos ya leidos): ¿quedo una descarga a medias?
         if (!ui.resumeChecked && g_drivesReady && progress.phase == Installer::Phase::Idle) {
             ui.resumeChecked = true;
@@ -1399,7 +1419,17 @@ void __cdecl main()
         } else if (ui.view == View::Network) {
             if (pressed & kA) startTest();
             if (pressed & kY) Route::startSearch();
-            if ((pressed & kBack) && Settings::proxyCount() > 0) Settings::setProxyOn(!Settings::proxyOn());
+            if (pressed & kBack) {
+                if (Settings::proxyCount() == 0) {
+                    _snprintf(ui.toast, sizeof(ui.toast), "No hay proxies guardados: pulsa Y para buscar");
+                } else {
+                    Settings::setProxyOn(!Settings::proxyOn());
+                    _snprintf(ui.toast, sizeof(ui.toast), Settings::proxyOn() ? "Proxies activados (%d)"
+                                                                             : "Proxies desactivados: todo directo",
+                              Settings::proxyCount());
+                }
+                ui.toastUntil = now + 3000;
+            }
             pressed &= ~(kY | kBack);
         }
 

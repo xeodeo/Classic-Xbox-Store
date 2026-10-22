@@ -1,5 +1,6 @@
 #include "store/Settings.h"
 
+#include "XboxXtl.h"
 #include "system/Files.h"
 #include "system/Log.h"
 
@@ -16,6 +17,15 @@ const char kPath[] = "T:\\cxs_config.txt";
 char s_proxies[Settings::kMaxProxies][32];
 int s_proxyCount;
 bool s_proxyOn;
+unsigned long long s_lastSearch;   // FILETIME (unidades de 100 ns)
+const unsigned long long kSearchEvery = 3ULL * 3600 * 10000000;   // 3 horas
+
+unsigned long long nowFileTime()
+{
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+    return (static_cast<unsigned long long>(ft.dwHighDateTime) << 32) | ft.dwLowDateTime;
+}
 
 void save()
 {
@@ -26,7 +36,9 @@ void save()
     }
     text += "\r\nproxy_activo=";
     text += s_proxyOn ? "1" : "0";
-    text += "\r\n";
+    char searched[48];
+    _snprintf(searched, sizeof(searched), "\r\nproxy_buscado=%I64u\r\n", s_lastSearch);
+    text += searched;
     Files::writeDurable(kPath, text.data(), text.size());
 }
 
@@ -62,6 +74,7 @@ void load()
                 }
             }
             if (key == "proxy_activo") s_proxyOn = value == "1";
+            if (key == "proxy_buscado") s_lastSearch = _strtoui64(value.c_str(), nullptr, 10);
         }
         at = end + 1;
     }
@@ -94,6 +107,19 @@ void setProxies(const char* const* list, int count, bool on)
 void setProxyOn(bool on)
 {
     s_proxyOn = on && s_proxyCount > 0;
+    save();
+}
+
+bool proxySearchDue()
+{
+    if (!proxyOn()) return false;
+    const unsigned long long now = nowFileTime();
+    return now < s_lastSearch || now - s_lastSearch >= kSearchEvery;   // reloj cambiado hacia atras: tambien
+}
+
+void markProxySearched()
+{
+    s_lastSearch = nowFileTime();
     save();
 }
 } // namespace Settings

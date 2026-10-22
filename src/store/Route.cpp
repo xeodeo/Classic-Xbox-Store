@@ -151,6 +151,7 @@ DWORD WINAPI searchThread(void*)
         _snprintf(s_message, sizeof(s_message), "Ninguno sirve ahora (directo %.2f MB/s): se queda como estaba", direct);
     }
     Log::write("ruta: %s", s_message);
+    Settings::markProxySearched();
     s_state = Route::State::Done;
     return 0;
 }
