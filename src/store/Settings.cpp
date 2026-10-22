@@ -13,14 +13,27 @@ namespace
 {
 const char kPath[] = "T:\\cxs_config.txt";
 
-char s_proxy[64];
+char s_proxies[Settings::kMaxProxies][32];
+int s_proxyCount;
 bool s_proxyOn;
 
 void save()
 {
-    char text[160];
-    const int length = _snprintf(text, sizeof(text), "proxy=%s\r\nproxy_activo=%d\r\n", s_proxy, s_proxyOn ? 1 : 0);
-    if (length > 0) Files::writeDurable(kPath, text, length);
+    std::string text = "proxies=";
+    for (int i = 0; i < s_proxyCount; ++i) {
+        if (i) text += ",";
+        text += s_proxies[i];
+    }
+    text += "\r\nproxy_activo=";
+    text += s_proxyOn ? "1" : "0";
+    text += "\r\n";
+    Files::writeDurable(kPath, text.data(), text.size());
+}
+
+void addProxy(const std::string& hostPort)
+{
+    if (s_proxyCount >= Settings::kMaxProxies || hostPort.empty() || hostPort.size() >= sizeof(s_proxies[0])) return;
+    _snprintf(s_proxies[s_proxyCount++], sizeof(s_proxies[0]), "%s", hostPort.c_str());
 }
 } // namespace
 
@@ -39,36 +52,48 @@ void load()
         const size_t equals = line.find('=');
         if (equals != std::string::npos) {
             const std::string key = line.substr(0, equals), value = line.substr(equals + 1);
-            if (key == "proxy") _snprintf(s_proxy, sizeof(s_proxy) - 1, "%s", value.c_str());
+            if (key == "proxies" || key == "proxy") {   // "proxy" = formato de la version anterior
+                size_t from = 0;
+                while (from <= value.size()) {
+                    size_t comma = value.find(',', from);
+                    if (comma == std::string::npos) comma = value.size();
+                    addProxy(value.substr(from, comma - from));
+                    from = comma + 1;
+                }
+            }
             if (key == "proxy_activo") s_proxyOn = value == "1";
         }
         at = end + 1;
     }
-    if (!s_proxy[0]) s_proxyOn = false;
-    Log::write("ajustes: proxy %s (%s)", s_proxy[0] ? s_proxy : "ninguno", s_proxyOn ? "activo" : "apagado");
+    Log::write("ajustes: %d proxies (%s)", s_proxyCount, proxyOn() ? "activos" : "apagados");
 }
 
-const char* proxy()
+int proxyCount()
 {
-    return s_proxy;
+    return s_proxyCount;
+}
+
+const char* proxyAt(int index)
+{
+    return index >= 0 && index < s_proxyCount ? s_proxies[index] : "";
 }
 
 bool proxyOn()
 {
-    return s_proxyOn && s_proxy[0];
+    return s_proxyOn && s_proxyCount > 0;
 }
 
-void setProxy(const char* hostPort, bool on)
+void setProxies(const char* const* list, int count, bool on)
 {
-    _snprintf(s_proxy, sizeof(s_proxy) - 1, "%s", hostPort ? hostPort : "");
-    s_proxy[sizeof(s_proxy) - 1] = 0;
-    s_proxyOn = on && s_proxy[0];
+    s_proxyCount = 0;
+    for (int i = 0; i < count; ++i) addProxy(list[i]);
+    s_proxyOn = on && s_proxyCount > 0;
     save();
 }
 
 void setProxyOn(bool on)
 {
-    s_proxyOn = on && s_proxy[0];
+    s_proxyOn = on && s_proxyCount > 0;
     save();
 }
 } // namespace Settings

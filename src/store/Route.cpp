@@ -124,19 +124,31 @@ DWORD WINAPI searchThread(void*)
 
     Guard guard(s_lock);
     const float direct = s_results[0].speed;
-    int best = -1;
+    // Los que funcionan y no son mucho mas lentos que la directa, el mejor primero.
+    // Los lentos se dejan fuera: un trozo que tarda mucho frena toda la descarga,
+    // porque los trozos se descomprimen en orden.
+    int order[Route::kMaxResults];
+    int good = 0;
     for (int i = 1; i < count; ++i) {
         Log::write("ruta: %s %.2f MB/s", s_results[i].label, s_results[i].speed);
-        if (s_results[i].speed > (best < 0 ? direct : s_results[best].speed)) best = i;
+        if (s_results[i].speed > 0 && s_results[i].speed >= direct * 0.6f) order[good++] = i;
     }
-    // Solo si gana con claridad: un proxy gratis puede caerse en cualquier momento.
-    if (best > 0 && s_results[best].speed >= direct * 1.2f) {
-        Settings::setProxy(s_results[best].label, true);
-        _snprintf(s_message, sizeof(s_message), "Proxy %s activo: %.2f MB/s por conexion (directo %.2f)",
-                  s_results[best].label, s_results[best].speed, direct);
+    for (int i = 1; i < good; ++i)
+        for (int j = i; j > 0 && s_results[order[j]].speed > s_results[order[j - 1]].speed; --j) {
+            const int t = order[j];
+            order[j] = order[j - 1];
+            order[j - 1] = t;
+        }
+    if (good > Settings::kMaxProxies) good = Settings::kMaxProxies;
+    if (good > 0) {
+        const char* list[Settings::kMaxProxies];
+        for (int i = 0; i < good; ++i) list[i] = s_results[order[i]].label;
+        Settings::setProxies(list, good, true);
+        _snprintf(s_message, sizeof(s_message),
+                  "%d proxies sirven (el mejor %.2f MB/s, directo %.2f): se usan junto con la conexion directa", good,
+                  s_results[order[0]].speed, direct);
     } else {
-        _snprintf(s_message, sizeof(s_message), "Ninguno gana a la conexion directa (%.2f MB/s): se queda como estaba",
-                  direct);
+        _snprintf(s_message, sizeof(s_message), "Ninguno sirve ahora (directo %.2f MB/s): se queda como estaba", direct);
     }
     Log::write("ruta: %s", s_message);
     s_state = Route::State::Done;

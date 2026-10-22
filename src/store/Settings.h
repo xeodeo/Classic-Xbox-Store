@@ -3,11 +3,14 @@
 // Ajustes que se guardan en T:\cxs_config.txt (lineas "clave=valor").
 namespace Settings
 {
+const int kMaxProxies = 6;
+
 void load();
 
-// Proxy para las descargas: "ip:puerto" (o "") y si esta activo.
-const char* proxy();
+// Proxies para las descargas ("ip:puerto", el mejor primero) y si estan activos.
+int proxyCount();
+const char* proxyAt(int index);
 bool proxyOn();
-void setProxy(const char* hostPort, bool on);
+void setProxies(const char* const* list, int count, bool on);
 void setProxyOn(bool on);
 }

@@ -815,7 +815,7 @@ const int kMaxAhead = 32;           // trozos como mucho por delante (lo limita 
 
 struct Fetcher
 {
-    std::string proxy;        // proxy elegido para la mitad de las conexiones ("" = todas directas)
+    std::vector<std::string> proxies;   // de los ajustes, el mejor primero (vacio = todas directas)
     std::string url;          // URL final del ZIP
     std::string headers;      // la cookie
     long long base = 0;       // donde empiezan los datos comprimidos
@@ -846,9 +846,15 @@ DWORD WINAPI fetchWorker(void* param)
     const int index = startInfo->index;
     delete startInfo;
     Http::RangeClient client;
-    // Con proxy: las pares van por el, las impares directas (se suman las dos rutas,
-    // y si el proxy se cae solo se pierde la mitad).
-    if (!f.proxy.empty() && index % 2 == 0) client.setProxy(f.proxy.c_str());
+    // Con proxies: las pares van por ellos (repartidas entre la lista), las impares
+    // directas. Se suman las rutas, y si los proxies caen solo se pierde la mitad.
+    const int proxyCount = static_cast<int>(f.proxies.size());
+    int proxy = -1;   // indice en la lista, o -1 = directa
+    int proxiesTried = 0;
+    if (proxyCount > 0 && index % 2 == 0) {
+        proxy = (index / 2) % proxyCount;
+        client.setProxy(f.proxies[proxy].c_str());
+    }
     int proxyFailures = 0;
     while (!f.stop && !s_cancel) {
         long long segment = -1;
@@ -869,9 +875,19 @@ DWORD WINAPI fetchWorker(void* param)
         for (int attempt = 1; ok && attempt <= 10 && !f.stop && !s_cancel; ++attempt) {
             if (client.fetch(f.url.c_str(), f.headers.c_str(), start, length, buffer, error, sizeof(error))) break;
             Log::write("instalar: trozo %I64d, intento %d: %s", segment, attempt, error);
-            if (client.usingProxy() && ++proxyFailures >= 2) {
-                Log::write("instalar: conexion %d deja el proxy y sigue directa", index);
-                client.setProxy("");
+            if (proxy >= 0 && ++proxyFailures >= 2) {
+                // Este proxy no sirve: probar el siguiente de la lista; si ya se
+                // probaron todos, seguir directa.
+                proxyFailures = 0;
+                if (++proxiesTried < proxyCount) {
+                    proxy = (proxy + 1) % proxyCount;
+                    client.setProxy(f.proxies[proxy].c_str());
+                    Log::write("instalar: conexion %d pasa al proxy %s", index, f.proxies[proxy].c_str());
+                } else {
+                    proxy = -1;
+                    client.setProxy("");
+                    Log::write("instalar: conexion %d: ningun proxy sirve, sigue directa", index);
+                }
             }
             if (attempt == 10) ok = false;
             for (int i = 0; i < attempt * 10 && !f.stop && !s_cancel; ++i) Sleep(100);
@@ -943,12 +959,14 @@ bool download(const std::string& url, Download& d, const ResumeState* resume)
     if (f->ahead < kWorkers) f->ahead = kWorkers;
     Log::write("instalar: %d conexiones, trozos de %d KB, %d por delante (memoria libre %d MB), hasta el byte %I64d",
                kWorkers, kSegment / 1024, f->ahead, freeMB, f->end);
-    // El proxy se elige en la vista Red (Y busca, Back activa); aqui solo se usa.
-    if (Settings::proxyOn()) f->proxy = Settings::proxy();
+    // Los proxies se eligen en la vista Red (Y busca, Back activa); aqui solo se usan.
+    if (Settings::proxyOn())
+        for (int i = 0; i < Settings::proxyCount(); ++i) f->proxies.push_back(Settings::proxyAt(i));
     {
         Guard guard(s_lock);
-        _snprintf(s_progress.route, sizeof(s_progress.route), "%s",
-                  f->proxy.empty() ? "directo" : ("proxy " + f->proxy + " + directo").c_str());
+        if (f->proxies.empty()) _snprintf(s_progress.route, sizeof(s_progress.route), "directo");
+        else _snprintf(s_progress.route, sizeof(s_progress.route), "%d proxies + directo (el mejor %s)",
+                       static_cast<int>(f->proxies.size()), f->proxies[0].c_str());
     }
     for (int i = 0; i < kWorkers; ++i) {
         InterlockedIncrement(&f->running);

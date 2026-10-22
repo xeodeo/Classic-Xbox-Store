@@ -677,8 +677,8 @@ void drawFooter(const Ui& ui, const char* left)
     if (ui.view == View::Network) {
         x = 96;
         x = hint(x, y, "A", 0xFF3FB53F, "probar");
-        x = hint(x, y, "Y", 0xFFE0B419, "buscar proxy");
-        x = hint(x, y, "Back", 0xFF707070, Settings::proxyOn() ? "quitar proxy" : "usar proxy");
+        x = hint(x, y, "Y", 0xFFE0B419, "buscar");
+        x = hint(x, y, "Back", 0xFF707070, Settings::proxyOn() ? "quitar proxies" : "usar proxies");
         hint(x, y, "X", 0xFF2F6FD0, "volver");
         return;
     } else if (ui.view == View::Account) {
@@ -884,8 +884,12 @@ void drawRecentLog(float y)
 void drawProxyStatus(float y)
 {
     char line[96];
-    if (!Settings::proxy()[0]) _snprintf(line, sizeof(line), "Proxy: ninguno (directo)");
-    else _snprintf(line, sizeof(line), "Proxy: %s (%s)", Settings::proxy(), Settings::proxyOn() ? "activo" : "apagado");
+    if (Settings::proxyCount() == 0) _snprintf(line, sizeof(line), "Proxies: ninguno (directo)");
+    else if (Settings::proxyCount() == 1)
+        _snprintf(line, sizeof(line), "Proxy: %s (%s)", Settings::proxyAt(0), Settings::proxyOn() ? "activo" : "apagado");
+    else
+        _snprintf(line, sizeof(line), "Proxies: %d, el mejor %s (%s)", Settings::proxyCount(), Settings::proxyAt(0),
+                  Settings::proxyOn() ? "activos" : "apagados");
     Gfx::textRight(Gfx::kSmall, line, Gfx::kWidth - kMargin - 8, y, Settings::proxyOn() ? kGreen : kTextDim);
 }
 
@@ -1395,7 +1399,7 @@ void __cdecl main()
         } else if (ui.view == View::Network) {
             if (pressed & kA) startTest();
             if (pressed & kY) Route::startSearch();
-            if ((pressed & kBack) && Settings::proxy()[0]) Settings::setProxyOn(!Settings::proxyOn());
+            if ((pressed & kBack) && Settings::proxyCount() > 0) Settings::setProxyOn(!Settings::proxyOn());
             pressed &= ~(kY | kBack);
         }
 
