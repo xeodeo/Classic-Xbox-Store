@@ -18,4 +18,7 @@ void setProxyOn(bool on);
 // activos) cuando la ultima busqueda tiene mas de unas horas. Reloj de la Xbox.
 bool proxySearchDue();
 void markProxySearched();
+
+// Idioma de la interfaz (ingles hasta que se cambie; luego se queda).
+void setLanguage(int language);
 }

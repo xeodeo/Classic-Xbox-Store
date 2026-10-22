@@ -1,5 +1,7 @@
 #include "net/Http.h"
 
+#include "ui/Lang.h"
+
 #include "XboxXtl.h"
 #include "system/Log.h"
 #include "system/Network.h"
@@ -72,7 +74,7 @@ bool tlsInit(char* error, int errorSize)
         {
             char text[96];
             mbedtls_strerror(ret, text, sizeof(text));
-            _snprintf(error, errorSize, "No arranca el cifrado: %s", text);
+            _snprintf(error, errorSize, tr("No arranca el cifrado: %s"), text);
         }
     }
     const bool ready = s_tlsReady;
@@ -266,7 +268,7 @@ bool open(Connection& c, const Url& url, char* error, int errorSize, const char*
     unsigned long address = 0;
     if (!Network::resolveIPv4(url.host, &address))
     {
-        _snprintf(error, errorSize, "No se encuentra %s (DNS)", url.host);
+        _snprintf(error, errorSize, tr("No se encuentra %s (DNS)"), url.host);
         return false;
     }
     char ip[24];
@@ -274,7 +276,7 @@ bool open(Connection& c, const Url& url, char* error, int errorSize, const char*
     c.socket = Network::tcpConnect(address, url.port, 10000);
     if (c.socket == Network::kInvalidSocket)
     {
-        _snprintf(error, errorSize, "%s no responde (error %d)", url.host, Network::lastError());
+        _snprintf(error, errorSize, tr("%s no responde (error %d)"), url.host, Network::lastError());
         Log::write("http: %s (%s) no conecta: %d", url.host, ip, Network::lastError());
         return false;
     }
@@ -304,9 +306,9 @@ connected:
         mbedtls_strerror(ret, text, sizeof(text));
         const uint32_t flags = mbedtls_ssl_get_verify_result(&c.ssl);
         if (ret == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED && flags)
-            _snprintf(error, errorSize, "Certificado de %s no valido (0x%x)", url.host, flags);
+            _snprintf(error, errorSize, tr("Certificado de %s no valido (0x%x)"), url.host, flags);
         else
-            _snprintf(error, errorSize, "Cifrado con %s: %s (-0x%04x)", url.host, text, -ret);
+            _snprintf(error, errorSize, tr("Cifrado con %s: %s (-0x%04x)"), url.host, text, -ret);
         Log::write("http: %s", error);
         return false;
     }
@@ -401,7 +403,7 @@ bool readChunked(BodyReader& body, Http::Sink sink, void* user, char* error, int
         const long size = strtol(line, nullptr, 16);
         if (n == 0 || size < 0)
         {
-            _snprintf(error, errorSize, "Respuesta por trozos rota");
+            _snprintf(error, errorSize, tr("Respuesta por trozos rota"));
             break;
         }
         if (size == 0)
@@ -417,7 +419,7 @@ bool readChunked(BodyReader& body, Http::Sink sink, void* user, char* error, int
                 break;
             if (!sink(buffer, got, user))
             {
-                _snprintf(error, errorSize, "Descarga cancelada");
+                _snprintf(error, errorSize, tr("Descarga cancelada"));
                 free(buffer);
                 return false;
             }
@@ -425,7 +427,7 @@ bool readChunked(BodyReader& body, Http::Sink sink, void* user, char* error, int
         }
         if (left > 0)
         {
-            _snprintf(error, errorSize, "Se corto la conexion");
+            _snprintf(error, errorSize, tr("Se corto la conexion"));
             break;
         }
         unsigned char crlf[2];
@@ -454,14 +456,14 @@ bool readPlain(BodyReader& body, long long contentLength, Http::Sink sink, void*
             break;   // sin tamaño: el final es el cierre
         if (got <= 0)
         {
-            _snprintf(error, errorSize, "Se corto la conexion");
+            _snprintf(error, errorSize, tr("Se corto la conexion"));
             ok = false;
             break;
         }
         received += got;
         if (!sink(buffer, got, user))
         {
-            _snprintf(error, errorSize, "Descarga cancelada");
+            _snprintf(error, errorSize, tr("Descarga cancelada"));
             ok = false;
             break;
         }
@@ -535,7 +537,7 @@ bool request(const char* method, const char* url, const char* extraHeaders, cons
         Url target;
         if (!parseUrl(response->finalUrl, &target))
         {
-            _snprintf(error, errorSize, "Direccion no valida");
+            _snprintf(error, errorSize, tr("Direccion no valida"));
             return false;
         }
         Connection c;
@@ -554,7 +556,7 @@ bool request(const char* method, const char* url, const char* extraHeaders, cons
         if (body) request.append(static_cast<const char*>(body), bodyLength);
         if (!c.writeAll(request.c_str(), static_cast<int>(request.size())))
         {
-            _snprintf(error, errorSize, "No se pudo enviar la peticion a %s", target.host);
+            _snprintf(error, errorSize, tr("No se pudo enviar la peticion a %s"), target.host);
             return false;
         }
 
@@ -566,7 +568,7 @@ bool request(const char* method, const char* url, const char* extraHeaders, cons
         {
             Log::write("http: %s no mando cabeceras (%d bytes recibidos)", target.host, filled);
             free(head);
-            _snprintf(error, errorSize, "%s no contesto bien", target.host);
+            _snprintf(error, errorSize, tr("%s no contesto bien"), target.host);
             return false;
         }
         head[bodyStart - 2] = 0;   // corta tras la ultima cabecera
@@ -587,7 +589,7 @@ bool request(const char* method, const char* url, const char* extraHeaders, cons
             free(head);
             if (!value[0])
             {
-                _snprintf(error, errorSize, "Redireccion sin destino");
+                _snprintf(error, errorSize, tr("Redireccion sin destino"));
                 return false;
             }
             if (value[0] == '/')
@@ -613,7 +615,7 @@ bool request(const char* method, const char* url, const char* extraHeaders, cons
         bool ok;
         if (status < 200 || status >= 300)
         {
-            _snprintf(error, errorSize, "%s respondio %d", target.host, status);
+            _snprintf(error, errorSize, tr("%s respondio %d"), target.host, status);
             ok = false;
         }
         else if (chunked)
@@ -627,7 +629,7 @@ bool request(const char* method, const char* url, const char* extraHeaders, cons
         free(head);
         return ok;
     }
-    _snprintf(error, errorSize, "Demasiadas redirecciones");
+    _snprintf(error, errorSize, tr("Demasiadas redirecciones"));
     return false;
 }
 
@@ -642,7 +644,7 @@ bool getToMemory(const char* url, const char* extraHeaders, int maxBytes, unsign
         *data = nullptr;
         *length = 0;
         if (m.length + 1 > maxBytes && !error[0])
-            _snprintf(error, errorSize, "Respuesta demasiado grande");
+            _snprintf(error, errorSize, tr("Respuesta demasiado grande"));
         return false;
     }
     *data = m.data;
@@ -700,7 +702,7 @@ bool RangeClient::fetch(const char* url, const char* extraHeaders, long long sta
     Url target;
     if (!parseUrl(url, &target))
     {
-        _snprintf(error, errorSize, "Direccion no valida");
+        _snprintf(error, errorSize, tr("Direccion no valida"));
         return false;
     }
     if (m_connection && (strcmp(m_host, target.host) != 0 || m_port != target.port || m_secure != target.secure))
@@ -729,7 +731,7 @@ bool RangeClient::fetch(const char* url, const char* extraHeaders, long long sta
     request += "\r\n";
     if (!c.writeAll(request.c_str(), static_cast<int>(request.size())))
     {
-        _snprintf(error, errorSize, "No se pudo enviar la peticion a %s", target.host);
+        _snprintf(error, errorSize, tr("No se pudo enviar la peticion a %s"), target.host);
         close();
         return false;
     }
@@ -739,7 +741,7 @@ bool RangeClient::fetch(const char* url, const char* extraHeaders, long long sta
     int filled = 0, bodyStart = 0;
     if (!readHead(c, head.data(), kHead, &filled, &bodyStart))
     {
-        _snprintf(error, errorSize, "%s no contesto", target.host);
+        _snprintf(error, errorSize, tr("%s no contesto"), target.host);
         close();
         return false;
     }
@@ -753,7 +755,7 @@ bool RangeClient::fetch(const char* url, const char* extraHeaders, long long sta
     const bool closeAfter = _stricmp(value, "close") == 0;
     if (status != 206 || contentLength != length)
     {
-        _snprintf(error, errorSize, "%s respondio %d (%I64d bytes en vez de %d)", target.host, status, contentLength,
+        _snprintf(error, errorSize, tr("%s respondio %d (%I64d bytes en vez de %d)"), target.host, status, contentLength,
                   length);
         close();
         return false;
@@ -767,7 +769,7 @@ bool RangeClient::fetch(const char* url, const char* extraHeaders, long long sta
         const int n = c.read(out + got, length - got);
         if (n <= 0)
         {
-            _snprintf(error, errorSize, "Se corto la conexion con %s", target.host);
+            _snprintf(error, errorSize, tr("Se corto la conexion con %s"), target.host);
             close();
             return false;
         }

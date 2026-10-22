@@ -1,5 +1,7 @@
 #include "store/Installer.h"
 
+#include "ui/Lang.h"
+
 #include "XboxXtl.h"
 #include "net/Http.h"
 #include "store/Session.h"
@@ -550,7 +552,7 @@ bool feed(Download& d, const unsigned char* data, int length)
         const bool written = d.parts->write(data + skip, static_cast<int>(length - skip));
         d.writeMs += GetTickCount() - t;
         if (!written) {
-            _snprintf(d.error, sizeof(d.error), "No se pudo escribir en el disco (¿lleno?)");
+            _snprintf(d.error, sizeof(d.error), tr("No se pudo escribir en el disco (¿lleno?)"));
             return false;
         }
     }
@@ -578,13 +580,13 @@ bool iso(Download& d, const unsigned char* data, int length)
     if (d.needed < 0 && written >= d.nextParse && written > kHeaderOffset + kSector) {
         d.nextParse = written + 64LL * 1024 * 1024;
         if (!d.parts->flush()) {
-            _snprintf(d.error, sizeof(d.error), "No se pudo escribir en el disco (¿lleno?)");
+            _snprintf(d.error, sizeof(d.error), tr("No se pudo escribir en el disco (¿lleno?)"));
             return false;
         }
         long long end = 0;
         const Parse r = readTree(*d.parts, d.files, &end);
         if (r == Parse::Bad) {
-            _snprintf(d.error, sizeof(d.error), "La ISO no tiene el formato de un disco de Xbox");
+            _snprintf(d.error, sizeof(d.error), tr("La ISO no tiene el formato de un disco de Xbox"));
             return false;
         }
         if (r == Parse::Ok) {
@@ -599,7 +601,7 @@ bool iso(Download& d, const unsigned char* data, int length)
             if (freeBytes(s_drive) < need) {
                 char gb[24];
                 formatGb(need, gb, sizeof(gb));
-                _snprintf(d.error, sizeof(d.error), "No hay espacio en %c: (faltan unos %s)", s_drive, gb);
+                _snprintf(d.error, sizeof(d.error), tr("No hay espacio en %c: (faltan unos %s)"), s_drive, gb);
                 return false;
             }
         }
@@ -654,17 +656,17 @@ void report(Download& d)
         // Medidas: cuanto del tiempo se va en zlib y en el disco (el resto es red y cifrado).
         const DWORD elapsed = now - d.startTick > 0 ? now - d.startTick : 1;
         Guard guard(s_lock);
-        _snprintf(s_progress.detail, sizeof(s_progress.detail), "zlib %lu%%  ·  disco %lu%%  ·  esperando red %lu%%",
+        _snprintf(s_progress.detail, sizeof(s_progress.detail), tr("zlib %lu%%  ·  disco %lu%%  ·  esperando red %lu%%"),
                   d.inflateMs * 100 / elapsed, d.writeMs * 100 / elapsed, d.waitMs * 100 / elapsed);
     }
     char text[160], iso[24];
     formatGb(d.position, iso, sizeof(iso));
     if (d.gameOffset < 0 || d.position < d.gameOffset)
-        _snprintf(text, sizeof(text), "Pasando la parte de video del disco, que no se guarda (ISO: %s)", iso);
+        _snprintf(text, sizeof(text), tr("Pasando la parte de video del disco, que no se guarda (ISO: %s)"), iso);
     else if (d.needed < 0)
-        _snprintf(text, sizeof(text), "Descargando el juego; aun buscando su lista de archivos (ISO: %s)", iso);
+        _snprintf(text, sizeof(text), tr("Descargando el juego; aun buscando su lista de archivos (ISO: %s)"), iso);
     else
-        _snprintf(text, sizeof(text), "Descargando el juego (ISO: %s)", iso);
+        _snprintf(text, sizeof(text), tr("Descargando el juego (ISO: %s)"), iso);
     text[sizeof(text) - 1] = 0;
     Guard guard(s_lock);
     if (s_progress.phase == Installer::Phase::Downloading)
@@ -746,7 +748,7 @@ bool consume(Download& d, const unsigned char* data, int length)
         if (ret == Z_STREAM_END) {
             d.streamEnd = true;
         } else if (ret != Z_OK && ret != Z_BUF_ERROR) {
-            _snprintf(d.error, sizeof(d.error), "El ZIP llego dañado (zlib %d)", ret);
+            _snprintf(d.error, sizeof(d.error), tr("El ZIP llego dañado (zlib %d)"), ret);
             return false;
         } else if (before == d.zs.avail_in && produced == 0) {
             break;   // zlib no avanza con esto: espera mas datos
@@ -767,7 +769,7 @@ bool readZipHeader(const std::string& url, Download& d, char* error, int errorSi
     Http::Response response;
     if (!Http::getToMemory(url.c_str(), headers.c_str(), 128 * 1024, &data, &length, &response, error, errorSize)) {
         if (response.status == 403 || response.status == 401)
-            _snprintf(error, errorSize, "archive.org no deja descargarlo: la sesión caducó o no vale");
+            _snprintf(error, errorSize, tr("archive.org no deja descargarlo: la sesión caducó o no vale"));
         return false;
     }
     d.dataUrl = response.finalUrl;
@@ -779,7 +781,7 @@ bool readZipHeader(const std::string& url, Download& d, char* error, int errorSi
         d.dataStart = 30 + nameLength + extraLength;
         d.stored = method == 0;
         ok = method == 0 || method == 8;
-        if (!ok) _snprintf(error, errorSize, "El ZIP usa un metodo que no conozco (%u)", method);
+        if (!ok) _snprintf(error, errorSize, tr("El ZIP usa un metodo que no conozco (%u)"), method);
         // Tamaño de la ISO: en la cabecera o, si no cabe en 32 bits, en el extra ZIP64.
         const unsigned size32 = u32(data + 22);
         if (!(flags & 8) && size32 != 0xFFFFFFFF) d.isoSize = size32;
@@ -791,7 +793,7 @@ bool readZipHeader(const std::string& url, Download& d, char* error, int errorSi
             at += 4 + size;
         }
     } else {
-        _snprintf(error, errorSize, "Lo descargado no es un ZIP");
+        _snprintf(error, errorSize, tr("Lo descargado no es un ZIP"));
     }
     free(data);
     Log::write("instalar: datos desde %I64d, %s, ISO de %I64d bytes", d.dataStart, d.stored ? "sin comprimir" : "deflate",
@@ -869,7 +871,8 @@ DWORD WINAPI fetchWorker(void* param)
         const int length = static_cast<int>(f.end - start < kSegment ? f.end - start : kSegment);
         unsigned char* buffer = static_cast<unsigned char*>(malloc(length));
         bool ok = buffer != nullptr;
-        char error[160] = "sin memoria";
+        char error[160];
+        _snprintf(error, sizeof(error), "%s", tr("sin memoria"));
         // Los fallos por un proxy no gastan los 10 intentos: con varios proxies
         // muertos, la conexion tiene que llegar a ir directa antes de rendirse.
         for (int attempt = 0; ok && !f.stop && !s_cancel;) {
@@ -894,7 +897,7 @@ DWORD WINAPI fetchWorker(void* param)
             free(buffer);
             if (!ok && !f.stop && !s_cancel) {
                 Guard guard(f.lock);
-                _snprintf(f.error, sizeof(f.error), "Se perdio la conexion con archive.org (%s)", error);
+                _snprintf(f.error, sizeof(f.error), tr("Se perdio la conexion con archive.org (%s)"), error);
                 f.stop = 1;
             }
             break;
@@ -913,7 +916,7 @@ DWORD WINAPI fetchWorker(void* param)
 bool download(const std::string& url, Download& d, const ResumeState* resume)
 {
     char error[160] = "";
-    setPhase(Installer::Phase::Downloading, "Conectando con archive.org...");
+    setPhase(Installer::Phase::Downloading, tr("Conectando con archive.org..."));
     if (!readZipHeader(url, d, error, sizeof(error))) {
         d.networkFailure = true;
         fail(error);
@@ -921,12 +924,12 @@ bool download(const std::string& url, Download& d, const ResumeState* resume)
     }
     memset(&d.zs, 0, sizeof(d.zs));
     if (!d.stored && inflateInit2(&d.zs, -MAX_WBITS) != Z_OK) {
-        fail("No arranca zlib");
+        fail(tr("No arranca zlib"));
         return false;
     }
     if (resume) {
         if (d.stored || resume->dataStart != d.dataStart) {
-            fail("El ZIP de archive.org cambio: hay que empezar de nuevo");
+            fail(tr("El ZIP de archive.org cambio: hay que empezar de nuevo"));
             return false;
         }
         d.consumed = resume->consumed;
@@ -962,8 +965,8 @@ bool download(const std::string& url, Download& d, const ResumeState* resume)
         for (int i = 0; i < Settings::proxyCount(); ++i) f->proxies.push_back(Settings::proxyAt(i));
     {
         Guard guard(s_lock);
-        if (f->proxies.empty()) _snprintf(s_progress.route, sizeof(s_progress.route), "directo");
-        else _snprintf(s_progress.route, sizeof(s_progress.route), "%d proxies + directo (el mejor %s)",
+        if (f->proxies.empty()) _snprintf(s_progress.route, sizeof(s_progress.route), tr("directo"));
+        else _snprintf(s_progress.route, sizeof(s_progress.route), tr("%d proxies + directo (el mejor %s)"),
                        static_cast<int>(f->proxies.size()), f->proxies[0].c_str());
     }
     for (int i = 0; i < kWorkers; ++i) {
@@ -977,7 +980,7 @@ bool download(const std::string& url, Download& d, const ResumeState* resume)
             InterlockedDecrement(&f->running);
         }
     }
-    setPhase(Installer::Phase::Downloading, "Descargando...");
+    setPhase(Installer::Phase::Downloading, tr("Descargando..."));
 
     bool ok = false;
     for (long long segment = 0;; ++segment) {
@@ -1025,7 +1028,7 @@ bool download(const std::string& url, Download& d, const ResumeState* resume)
         d.networkFailure = true;
     }
     if (!ok && !s_cancel && !d.error[0]) d.networkFailure = true;   // se interrumpio sin motivo concreto
-    setPhase(Installer::Phase::Downloading, ok ? "Terminando la descarga..." : "Cerrando conexiones...");
+    setPhase(Installer::Phase::Downloading, ok ? tr("Terminando la descarga...") : tr("Cerrando conexiones..."));
     while (f->running) Sleep(20);
     for (int i = 0; i < kMaxAhead; ++i) free(f->data[i]);
     d.fetchedKB = nullptr;
@@ -1036,7 +1039,7 @@ bool download(const std::string& url, Download& d, const ResumeState* resume)
     if (!d.stored) inflateEnd(&d.zs);
     free(d.out);
     d.out = nullptr;
-    if (!ok && !s_cancel) fail(d.error[0] ? d.error : "La descarga se interrumpio");
+    if (!ok && !s_cancel) fail(d.error[0] ? d.error : tr("La descarga se interrumpio"));
     return ok;
 }
 
@@ -1091,7 +1094,7 @@ bool extract(Parts& parts, std::vector<FileEntry> files, const char* folder)
     for (const FileEntry& f : files)
         if (!f.directory) total += f.size;
     long long done = 0;
-    setPhase(Installer::Phase::Installing, "Instalando archivos...");
+    setPhase(Installer::Phase::Installing, tr("Instalando archivos..."));
     setCounters(0, total, 0);
 
     std::vector<unsigned char> buffer(1024 * 1024);
@@ -1114,7 +1117,7 @@ bool extract(Parts& parts, std::vector<FileEntry> files, const char* folder)
         HANDLE out = CreateFileA(path.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
         if (out == INVALID_HANDLE_VALUE) {
             char text[160];
-            _snprintf(text, sizeof(text), "No se pudo crear %s", f.path.c_str());
+            _snprintf(text, sizeof(text), tr("No se pudo crear %s"), f.path.c_str());
             fail(text);
             return false;
         }
@@ -1140,7 +1143,7 @@ bool extract(Parts& parts, std::vector<FileEntry> files, const char* folder)
         if (!ok) {
             if (!s_cancel) {
                 char text[160];
-                _snprintf(text, sizeof(text), "Fallo al copiar %s (¿disco lleno?)", f.path.c_str());
+                _snprintf(text, sizeof(text), tr("Fallo al copiar %s (¿disco lleno?)"), f.path.c_str());
                 fail(text);
             }
             return false;
@@ -1149,7 +1152,7 @@ bool extract(Parts& parts, std::vector<FileEntry> files, const char* folder)
     if (skipped) Log::write("instalar: %d archivos ya estaban copiados", skipped);
 
     // Comprobacion final: cada archivo con el tamaño que dice el disco original.
-    setPhase(Installer::Phase::Installing, "Comprobando los archivos...");
+    setPhase(Installer::Phase::Installing, tr("Comprobando los archivos..."));
     int bad = 0;
     for (const FileEntry& f : files) {
         if (f.directory) continue;
@@ -1162,7 +1165,7 @@ bool extract(Parts& parts, std::vector<FileEntry> files, const char* folder)
     }
     if (bad) {
         char text[160];
-        _snprintf(text, sizeof(text), "%d archivos no quedaron bien. Vuelve a intentarlo (se sigue donde iba).", bad);
+        _snprintf(text, sizeof(text), tr("%d archivos no quedaron bien. Vuelve a intentarlo (se sigue donde iba)."), bad);
         fail(text);
         return false;
     }
@@ -1176,7 +1179,7 @@ void run()
 {
     const bool autotest = STORE_AUTOTEST && s_game.collection == "autotest";
     if (!autotest && !Session::loggedIn()) {
-        fail("Falta la sesión de archive.org: pulsa Start para iniciarla");
+        fail(tr("Falta la sesión de archive.org: pulsa Start para iniciarla"));
         return;
     }
 
@@ -1204,8 +1207,8 @@ void run()
     if (s_resume ? !parts.openExisting(s_resume->written) : !parts.create()) {
         deleteResume();
         parts.removeAll();
-        fail(s_resume ? "Lo descargado antes ya no esta en el disco: hay que empezar de nuevo"
-                      : "No se pudo crear la carpeta temporal en el disco");
+        fail(s_resume ? tr("Lo descargado antes ya no esta en el disco: hay que empezar de nuevo")
+                      : tr("No se pudo crear la carpeta temporal en el disco"));
         return;
     }
 
@@ -1220,7 +1223,7 @@ void run()
         Log::write("instalar: cancelado durante la descarga; borrando los trozos");
         parts.removeAll();
         deleteResume();
-        setPhase(Installer::Phase::Cancelled, "Cancelado");
+        setPhase(Installer::Phase::Cancelled, tr("Cancelado"));
         Log::write("instalar: cancelado, limpio");
         return;
     }
@@ -1230,7 +1233,7 @@ void run()
             parts.close();
             Installer::Progress text = Installer::progress();
             char message[200];
-            _snprintf(message, sizeof(message), "%s. Lo descargado se guarda: al abrir la tienda podras seguir.", text.text);
+            _snprintf(message, sizeof(message), tr("%s. Lo descargado se guarda: al abrir la tienda podras seguir."), text.text);
             setPhase(Installer::Phase::Failed, message);
             Log::write("instalar: se guarda lo descargado para seguir otro dia");
         } else {
@@ -1242,7 +1245,7 @@ void run()
     if (alreadyDownloaded) d.needed = -1;   // el arbol se lee abajo, de los trozos
     if (!parts.flush()) {
         parts.removeAll();
-        fail("No se pudo escribir en el disco (¿lleno?)");
+        fail(tr("No se pudo escribir en el disco (¿lleno?)"));
         return;
     }
     // Si el arbol aun no se habia podido leer (estaba al final), ahora si.
@@ -1250,7 +1253,7 @@ void run()
         long long end = 0;
         if (readTree(parts, d.files, &end) != Parse::Ok) {
             parts.removeAll();
-            fail("La ISO descargada no tiene el formato de un disco de Xbox");
+            fail(tr("La ISO descargada no tiene el formato de un disco de Xbox"));
             return;
         }
     }
@@ -1261,7 +1264,7 @@ void run()
     if (freeBytes(s_drive) < gameBytes + 64LL * 1024 * 1024) {
         char gb[24], text[160];
         formatGb(gameBytes, gb, sizeof(gb));
-        _snprintf(text, sizeof(text), "No hay espacio en %c: para instalar (%s)", s_drive, gb);
+        _snprintf(text, sizeof(text), tr("No hay espacio en %c: para instalar (%s)"), s_drive, gb);
         parts.removeAll();
         fail(text);
         return;
@@ -1295,7 +1298,7 @@ void run()
             removeInstalled(folder, d.files);
             parts.removeAll();
             deleteResume();
-            setPhase(Installer::Phase::Cancelled, "Cancelado: se borró todo lo descargado y copiado");
+            setPhase(Installer::Phase::Cancelled, tr("Cancelado: se borró todo lo descargado y copiado"));
         } else {
             parts.close();   // fallo copiando: los trozos se quedan para seguir
         }
@@ -1304,7 +1307,7 @@ void run()
     parts.removeAll();
     deleteResume();
     char text[160];
-    _snprintf(text, sizeof(text), "Instalado en %s", folder);
+    _snprintf(text, sizeof(text), tr("Instalado en %s"), folder);
     Log::write("instalar: %s", text);
     setPhase(Installer::Phase::Done, text);
 }
@@ -1330,7 +1333,7 @@ bool launch(const Catalog::Game& game, char drive)
         s_progress.art = game.art;
         _snprintf(s_progress.title, sizeof(s_progress.title), "%s", game.title.c_str());
         s_progress.title[sizeof(s_progress.title) - 1] = 0;
-        _snprintf(s_progress.text, sizeof(s_progress.text), "Conectando con archive.org...");
+        _snprintf(s_progress.text, sizeof(s_progress.text), tr("Conectando con archive.org..."));
         s_progress.total = -1;
     }
     HANDLE h = CreateThread(NULL, 256 * 1024, worker, NULL, 0, NULL);

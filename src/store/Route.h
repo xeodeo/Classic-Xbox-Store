@@ -4,7 +4,8 @@
 // Se lanza desde la vista Red (no en cada descarga): baja la lista de
 // ProxyScrape y prueba hasta 12, todos a la vez, con un archivo publico de
 // archive.org (la sesion no pasa por los proxies). Los que funcionen y vayan al
-// menos al 60 % de la directa se guardan (el mejor primero) y quedan activos.
+// menos al 60 % de la directa se guardan (el mejor primero); activarlos es cosa
+// del usuario (por defecto, apagados).
 namespace Route
 {
 const int kMaxResults = 13;   // directo + 12 proxies

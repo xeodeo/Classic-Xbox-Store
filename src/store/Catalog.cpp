@@ -1,5 +1,7 @@
 #include "store/Catalog.h"
 
+#include "ui/Lang.h"
+
 #include "XboxXtl.h"
 #include "net/Http.h"
 #include "system/Files.h"
@@ -211,9 +213,9 @@ void loadLetter(int letter)
     }
     if (haveCache) {
         std::sort(cached.begin(), cached.end(), lessByTitle);
-        publish(letter, Catalog::State::Ready, &cached, "Actualizando...");
+        publish(letter, Catalog::State::Ready, &cached, tr("Actualizando..."));
     } else {
-        publish(letter, Catalog::State::Loading, nullptr, "Cargando la lista de archive.org...");
+        publish(letter, Catalog::State::Loading, nullptr, tr("Cargando la lista de archive.org..."));
     }
 
     // 2) La red.
@@ -225,7 +227,7 @@ void loadLetter(int letter)
         int length = 0;
         Http::Response response;
         if (!Http::getToMemory(url, nullptr, 2 * 1024 * 1024, &data, &length, &response, error, sizeof(error))) {
-            if (haveCache) publish(letter, Catalog::State::Ready, nullptr, std::string("Lista guardada (") + error + ")");
+            if (haveCache) publish(letter, Catalog::State::Ready, nullptr, std::string(tr("Lista guardada (")) + error + ")");
             else publish(letter, Catalog::State::Failed, nullptr, error);
             return;
         }

@@ -1,5 +1,7 @@
 #include "store/Route.h"
 
+#include "ui/Lang.h"
+
 #include "XboxXtl.h"
 #include "net/Http.h"
 #include "store/Settings.h"
@@ -82,14 +84,14 @@ DWORD WINAPI searchThread(void*)
     if (url.empty() ||
         !Http::getToMemory(kProxyList, nullptr, 64 * 1024, &list, &length, &response, error, sizeof(error))) {
         Guard guard(s_lock);
-        _snprintf(s_message, sizeof(s_message), "No se pudo buscar (%s)", error);
+        _snprintf(s_message, sizeof(s_message), tr("No se pudo buscar (%s)"), error);
         s_state = Route::State::Done;
         return 0;
     }
     {
         Guard guard(s_lock);
         s_count = 1;
-        _snprintf(s_results[0].label, sizeof(s_results[0].label), "directo");
+        _snprintf(s_results[0].label, sizeof(s_results[0].label), tr("directo"));
         std::string text(reinterpret_cast<char*>(list), length);
         size_t at = 0;
         while (at < text.size() && s_count < Route::kMaxResults) {
@@ -143,12 +145,16 @@ DWORD WINAPI searchThread(void*)
     if (good > 0) {
         const char* list[Settings::kMaxProxies];
         for (int i = 0; i < good; ++i) list[i] = s_results[order[i]].label;
-        Settings::setProxies(list, good, true);
+        // Se guardan sin cambiar si estan activos: por defecto apagados, los
+        // activa el usuario con Y en Proxies.
+        const bool on = Settings::proxyOn();
+        Settings::setProxies(list, good, on);
         _snprintf(s_message, sizeof(s_message),
-                  "%d proxies sirven (el mejor %.2f MB/s, directo %.2f): se usan junto con la conexion directa", good,
-                  s_results[order[0]].speed, direct);
+                  on ? tr("%d proxies sirven (el mejor %.2f MB/s, directo %.2f): siguen activos")
+                     : tr("%d proxies sirven (el mejor %.2f MB/s, directo %.2f). Pulsa Y para activarlos"),
+                  good, s_results[order[0]].speed, direct);
     } else {
-        _snprintf(s_message, sizeof(s_message), "Ninguno sirve ahora (directo %.2f MB/s): se queda como estaba", direct);
+        _snprintf(s_message, sizeof(s_message), tr("Ninguno sirve ahora (directo %.2f MB/s): se queda como estaba"), direct);
     }
     Log::write("ruta: %s", s_message);
     Settings::markProxySearched();
@@ -167,7 +173,7 @@ void startSearch()
         s_state = State::Searching;
         s_count = 0;
         memset(s_results, 0, sizeof(s_results));
-        _snprintf(s_message, sizeof(s_message), "Buscando proxies cercanos y probandolos...");
+        _snprintf(s_message, sizeof(s_message), tr("Buscando proxies cercanos y probandolos..."));
     }
     HANDLE h = CreateThread(NULL, 128 * 1024, searchThread, NULL, 0, NULL);
     if (h) CloseHandle(h);

@@ -3,6 +3,7 @@
 #include "XboxXtl.h"
 #include "system/Files.h"
 #include "system/Log.h"
+#include "ui/Lang.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -36,6 +37,8 @@ void save()
     }
     text += "\r\nproxy_activo=";
     text += s_proxyOn ? "1" : "0";
+    text += "\r\nidioma=";
+    text += Lang::code(Lang::current());
     char searched[48];
     _snprintf(searched, sizeof(searched), "\r\nproxy_buscado=%I64u\r\n", s_lastSearch);
     text += searched;
@@ -74,6 +77,7 @@ void load()
                 }
             }
             if (key == "proxy_activo") s_proxyOn = value == "1";
+            if (key == "idioma") Lang::set(Lang::fromCode(value.c_str()));
             if (key == "proxy_buscado") s_lastSearch = _strtoui64(value.c_str(), nullptr, 10);
         }
         at = end + 1;
@@ -107,6 +111,12 @@ void setProxies(const char* const* list, int count, bool on)
 void setProxyOn(bool on)
 {
     s_proxyOn = on && s_proxyCount > 0;
+    save();
+}
+
+void setLanguage(int language)
+{
+    Lang::set(static_cast<Lang::Language>(language));
     save();
 }
 

@@ -23,7 +23,8 @@ Es la versión para consola de [Classic Xbox Loader](https://github.com/xeodeo) 
 - **Seguir lo que quedó a medias:** cada 128 MB se guarda un punto de control (el estado de zlib incluido, como el ejemplo `zran` de zlib). Si se apaga la consola, se sale con la combinación de botones o se cae la red, al abrir la tienda pregunta si se quiere seguir. Lo mismo si se corta mientras copia.
 - **Instalados (Y):** los juegos y aplicaciones del disco duro (cualquier carpeta de primer nivel con subcarpetas que tengan `default.xbe`), separados en *Juegos* y *Aplicaciones*. **A los abre.**
 - **Cuenta (Start):** iniciar sesión en archive.org desde la consola con un teclado en pantalla (archive.org no deja bajar estas colecciones sin sesión). La contraseña no se guarda: solo las cookies que devuelve archive.org, en `T:\ia_session.json`. También vale el `ia_session.json` de Classic Xbox Loader copiado junto al `default.xbe`.
-- **Red (X):** diagnóstico (IP, DNS, conexiones, HTTPS), **buscar un proxy** cercano y más rápido (Y) y activarlo o quitarlo (Back), y las últimas líneas del registro.
+- **Red (X):** diagnóstico (IP, DNS, conexiones, HTTPS) y las últimas líneas del registro. **Y abre Proxies:** buscar proxies gratis cercanos (A) y activarlos o quitarlos (Y). Vienen **apagados por defecto**; si se activan, la mitad de las conexiones va por ellos, la lista se renueva sola cada 3 horas y una conexión cuyo proxy falla sigue directa.
+- **Idiomas:** inglés (por defecto), español y portugués. Se cambian en Cuenta (Start) con Y y la elección se guarda.
 
 ## Cómo funciona por dentro
 
@@ -97,6 +98,7 @@ El compilador del XDK es Visual C++ 7.1 (2003), que no entiende C++17. Así que 
 | `assets/certs/roots.pem` | Certificados raíz (Let's Encrypt/ISRG, GoDaddy, DigiCert, USERTrust, GlobalSign) | de `certifi` |
 | `assets/data/artindex.tsv` | Índice de portadas (nombre redump → XMID, Title ID y arte disponible) | `python scripts/make_art_index.py` |
 | `assets/icon/` | Icono del panel, de las partidas guardadas y `default.tbn` | `python scripts/make_icon.py` |
+| `src/ui/LangTable.inc` | Traducciones (inglés y portugués) de los textos, que en el código están en español | `python scripts/make_lang.py` (desde `scripts/translations.py`) |
 
 ## Usar en la consola
 
@@ -106,11 +108,10 @@ El compilador del XDK es Visual C++ 7.1 (2003), que no entiende C++17. Así que 
 
 | Botón | Tienda | Instalados | Red |
 |---|---|---|---|
-| A | instalar | abrir | probar la red |
-| Y | ir a Instalados | ir a la Tienda | buscar proxy |
+| A | instalar | abrir | probar la red (en Proxies: buscar) |
+| Y | ir a Instalados | ir a la Tienda | abrir Proxies (en Proxies: activar / quitar) |
 | X | Red | Red | volver |
-| Back | — | — | usar / quitar proxy |
-| Start | Cuenta | Cuenta | Cuenta |
+| Start | Cuenta (Y: idioma) | Cuenta | Cuenta |
 | Izquierda / derecha | letra | — | — |
 | Gatillos | página | página | — |
 | B | volver al panel | volver al panel | volver al panel |

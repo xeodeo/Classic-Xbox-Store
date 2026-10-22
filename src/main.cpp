@@ -32,6 +32,7 @@
 #include "ui/Gfx.h"
 #include "ui/ImageDecode.h"
 #include "ui/Keyboard.h"
+#include "ui/Lang.h"
 
 namespace {
 
@@ -126,13 +127,13 @@ volatile LONG g_probeCount;
 const char* errorName(int error)
 {
     switch (error) {
-    case WSAETIMEDOUT: return "nadie contesta (tiempo agotado)";
-    case WSAECONNREFUSED: return "rechazada";
-    case WSAEHOSTUNREACH: return "sin ruta al servidor";
-    case WSAENETUNREACH: return "red inalcanzable";
-    case WSAECONNRESET: return "cortada por el otro lado";
-    case WSAEWOULDBLOCK: return "sigue esperando";
-    default: return "error";
+    case WSAETIMEDOUT: return tr("nadie contesta (tiempo agotado)");
+    case WSAECONNREFUSED: return tr("rechazada");
+    case WSAEHOSTUNREACH: return tr("sin ruta al servidor");
+    case WSAENETUNREACH: return tr("red inalcanzable");
+    case WSAECONNRESET: return tr("cortada por el otro lado");
+    case WSAEWOULDBLOCK: return tr("sigue esperando");
+    default: return tr("error");
     }
 }
 
@@ -167,7 +168,7 @@ void probeTcp(const char* label, unsigned long address, int port, bool blocking)
         p.state = ProbeState::Failed;
     } else {
         Network::tcpClose(s);
-        _snprintf(p.result, sizeof(p.result), "conecta  (%lu ms)", ms);
+        _snprintf(p.result, sizeof(p.result), tr("conecta  (%lu ms)"), ms);
         p.state = ProbeState::Ok;
     }
     p.result[sizeof(p.result) - 1] = 0;
@@ -188,7 +189,7 @@ void probeHttps(const char* label, const char* url)
         return;
     }
     const DWORD ms = GetTickCount() - start;
-    _snprintf(p.result, sizeof(p.result), "%d  ·  %d KB en %lu ms", response.status, length / 1024, ms);
+    _snprintf(p.result, sizeof(p.result), tr("%d  ·  %d KB en %lu ms"), response.status, length / 1024, ms);
     p.result[sizeof(p.result) - 1] = 0;
     p.state = ProbeState::Ok;
     free(data);
@@ -199,10 +200,10 @@ void runProbes(unsigned long archive)
     g_probeCount = 0;
     const unsigned long flags = Network::addressFlags();
     char line[80];
-    _snprintf(line, sizeof(line), "%s  ·  %s  ·  puerta de enlace %s  ·  DNS %s", g_ip,
-              (flags & XNET_GET_XNADDR_DHCP) ? "DHCP" : (flags & XNET_GET_XNADDR_STATIC) ? "IP fija" : "?",
-              (flags & XNET_GET_XNADDR_GATEWAY) ? "sí" : "no", (flags & XNET_GET_XNADDR_DNS) ? "sí" : "no");
-    info("Consola", line);
+    _snprintf(line, sizeof(line), tr("%s  ·  %s  ·  puerta de enlace %s  ·  DNS %s"), g_ip,
+              (flags & XNET_GET_XNADDR_DHCP) ? "DHCP" : (flags & XNET_GET_XNADDR_STATIC) ? tr("IP fija") : "?",
+              (flags & XNET_GET_XNADDR_GATEWAY) ? tr("sí") : tr("no"), (flags & XNET_GET_XNADDR_DNS) ? tr("sí") : tr("no"));
+    info(tr("Consola"), line);
     const unsigned long cloudflare = inet_addr("1.1.1.1");
     unsigned long router = 0;
     if (g_ip[0]) {
@@ -211,7 +212,7 @@ void runProbes(unsigned long archive)
     }
     if (archive) {
         probeTcp("archive.org : 443", archive, 443, false);
-        probeTcp("archive.org : 443 con bloqueo", archive, 443, true);
+        probeTcp(tr("archive.org : 443 con bloqueo"), archive, 443, true);
         probeTcp("archive.org : 80", archive, 80, false);
     }
     probeTcp("1.1.1.1 : 443", cloudflare, 443, false);
@@ -238,7 +239,7 @@ DWORD WINAPI testThread(void*)
 
     g_archive = ArchiveState::Waiting;
     if (!Network::initialize()) {
-        _snprintf(g_archiveText, sizeof(g_archiveText), "La red no arranca (XNetStartup)");
+        _snprintf(g_archiveText, sizeof(g_archiveText), tr("La red no arranca (XNetStartup)"));
         g_net = NetState::Offline;
         g_archive = ArchiveState::Failed;
         InterlockedExchange(&g_testRunning, 0);
@@ -248,7 +249,7 @@ DWORD WINAPI testThread(void*)
     const bool cable = Network::cableConnected();
     g_net = cable && g_ip[0] ? NetState::Online : NetState::Offline;
     if (!cable) {
-        _snprintf(g_archiveText, sizeof(g_archiveText), "Sin cable de red");
+        _snprintf(g_archiveText, sizeof(g_archiveText), tr("Sin cable de red"));
         g_archive = ArchiveState::Failed;
         InterlockedExchange(&g_testRunning, 0);
         return 0;
@@ -258,8 +259,8 @@ DWORD WINAPI testThread(void*)
     unsigned long address = 0;
     const char* via = "";
     if (!Network::resolveIPv4("archive.org", &address, &via)) {
-        _snprintf(g_archiveText, sizeof(g_archiveText), "Sin DNS  ·  puerta de enlace %s  ·  DNS en el panel %s",
-                  Network::hasGateway() ? "sí" : "no", Network::hasDnsServer() ? "sí" : "no");
+        _snprintf(g_archiveText, sizeof(g_archiveText), tr("Sin DNS  ·  puerta de enlace %s  ·  DNS en el panel %s"),
+                  Network::hasGateway() ? tr("sí") : tr("no"), Network::hasDnsServer() ? tr("sí") : tr("no"));
         g_archive = ArchiveState::Failed;
         runProbes(0);
         InterlockedExchange(&g_testRunning, 0);
@@ -272,7 +273,7 @@ DWORD WINAPI testThread(void*)
     const DWORD ms = GetTickCount() - start;
     if (s == Network::kInvalidSocket) {
         const int error = Network::lastError();
-        _snprintf(g_archiveText, sizeof(g_archiveText), "archive.org %s: 443 %s (%d)  ·  X para diagnóstico", remote,
+        _snprintf(g_archiveText, sizeof(g_archiveText), tr("archive.org %s: 443 %s (%d)  ·  X para diagnóstico"), remote,
                   errorName(error), error);
         g_archive = ArchiveState::Failed;
     } else {
@@ -320,7 +321,7 @@ void speedTest(const char* label, bool blocking)
     const bool ok = Http::get("http://10.0.2.2:8000/Halo%20-%20Combat%20Evolved%20%28Europe%29.zip",
                               "Range: bytes=0-31457279\r\n", countSink, &bytes, &response, error, sizeof(error));
     const DWORD ms = GetTickCount() - start;
-    _snprintf(p.result, sizeof(p.result), "%s%.2f MB/s  (%d MB en %lu ms)", ok ? "" : "FALLO ",
+    _snprintf(p.result, sizeof(p.result), "%s%.2f MB/s  (%d MB en %lu ms)", ok ? "" : tr("FALLO "),
               bytes / 1048576.0 / (ms / 1000.0 + 0.001), static_cast<int>(bytes / 1048576), ms);
     p.state = ok ? ProbeState::Ok : ProbeState::Failed;
     Network::setBlockingStreams(false);
@@ -582,7 +583,7 @@ void drawDetails(const Ui& ui, float top, const char* title, const char* region,
         Gfx::rect(x, top, kCoverW, kCoverH, 0xFF1C3A22, 0xFF0B160D);
         wrap(Gfx::kLabel, title, x + 10, top + 14, kCoverW - 20, 5, 0xC0FFFFFF);
         if (art && art->thumbnail[0])
-            Gfx::text(Gfx::kSmall, "Cargando portada...", x + 10, top + kCoverH - 26, kTextDim);
+            Gfx::text(Gfx::kSmall, tr("Cargando portada..."), x + 10, top + kCoverH - 26, kTextDim);
     }
     float y = top + kCoverH + 8;
     y = wrap(Gfx::kLabel, title, x, y, kCoverW, 2, kText);
@@ -629,20 +630,20 @@ void moveCursor(Cursor& c, unsigned pressed, int count, int visible)
 void drawHeader(const Ui& ui)
 {
     const float w = Gfx::text(Gfx::kTitle, "Classic Xbox Store", kMargin, 14, kText);
-    const char* section = Installer::progress().phase != Installer::Phase::Idle ? "Instalando"
-                           : ui.view == View::Store                         ? "Tienda"
-                           : ui.view == View::Installed                     ? "Instalados"
-                           : ui.view == View::Account                       ? "Cuenta"
-                                                                            : "Red";
+    const char* section = Installer::progress().phase != Installer::Phase::Idle ? tr("Instalando")
+                           : ui.view == View::Store                         ? tr("Tienda")
+                           : ui.view == View::Installed                     ? tr("Instalados")
+                           : ui.view == View::Account                       ? tr("Cuenta")
+                                                                            : tr("Red");
     Gfx::text(Gfx::kBody, section, kMargin + w + 14, 22, kGreen);
 
     // Red y archive.org, a la derecha, como la temperatura en PKGi.
     char line[160];
     unsigned long color = kTextDim;
     if (g_net == NetState::Starting || g_archive == ArchiveState::Waiting) {
-        _snprintf(line, sizeof(line), "Conectando...");
+        _snprintf(line, sizeof(line), tr("Conectando..."));
     } else if (g_archive == ArchiveState::Checking) {
-        _snprintf(line, sizeof(line), "%s  ·  buscando archive.org...", g_ip);
+        _snprintf(line, sizeof(line), tr("%s  ·  buscando archive.org..."), g_ip);
     } else if (g_archive == ArchiveState::Ok) {
         _snprintf(line, sizeof(line), "%s  ·  %s", g_ip, g_archiveText);
         color = kGreen;
@@ -679,30 +680,31 @@ void drawFooter(const Ui& ui, const char* left)
     float x = ui.view == View::Store ? 150 : 196;
     if (ui.view == View::Network && ui.proxyPanel) {
         x = 110;
-        if (Route::state() != Route::State::Searching) x = hint(x, y, "A", 0xFF3FB53F, "buscar");
+        if (Route::state() != Route::State::Searching) x = hint(x, y, "A", 0xFF3FB53F, tr("buscar"));
         if (Settings::proxyCount() > 0)
-            x = hint(x, y, "Y", 0xFFE0B419, Settings::proxyOn() ? "desactivar" : "activar");
-        hint(x, y, "B", 0xFFD03A3A, "volver");
+            x = hint(x, y, "Y", 0xFFE0B419, Settings::proxyOn() ? tr("desactivar") : tr("activar"));
+        hint(x, y, "B", 0xFFD03A3A, tr("volver"));
         return;
     } else if (ui.view == View::Network) {
         x = 110;
-        x = hint(x, y, "A", 0xFF3FB53F, "probar");
-        x = hint(x, y, "Y", 0xFFE0B419, "proxies");
-        hint(x, y, "X", 0xFF2F6FD0, "volver");
+        x = hint(x, y, "A", 0xFF3FB53F, tr("probar"));
+        x = hint(x, y, "Y", 0xFFE0B419, tr("proxies"));
+        hint(x, y, "X", 0xFF2F6FD0, tr("volver"));
         return;
     } else if (ui.view == View::Account) {
         x = 110;
-        if (Session::loginState() != Session::Login::Working) x = hint(x, y, "A", 0xFF3FB53F, "iniciar sesión");
-        if (strcmp(Session::source(), "consola") == 0) x = hint(x, y, "X", 0xFF2F6FD0, "cerrar sesión");
-        hint(x, y, "B", 0xFFD03A3A, "volver");
+        if (Session::loginState() != Session::Login::Working) x = hint(x, y, "A", 0xFF3FB53F, tr("iniciar sesión"));
+        if (strcmp(Session::source(), "consola") == 0) x = hint(x, y, "X", 0xFF2F6FD0, tr("cerrar sesión"));
+        x = hint(x, y, "Y", 0xFFE0B419, tr("idioma"));
+        hint(x, y, "B", 0xFFD03A3A, tr("volver"));
         return;
     } else {
-        if (ui.view == View::Store) x = hint(x, y, "A", 0xFF3FB53F, "instalar");
-        if (ui.view == View::Installed) x = hint(x, y, "A", 0xFF3FB53F, "abrir");
-        x = hint(x, y, "Y", 0xFFE0B419, ui.view == View::Store ? "instalados" : "tienda");
-        x = hint(x, y, "X", 0xFF2F6FD0, "red");
+        if (ui.view == View::Store) x = hint(x, y, "A", 0xFF3FB53F, tr("instalar"));
+        if (ui.view == View::Installed) x = hint(x, y, "A", 0xFF3FB53F, tr("abrir"));
+        x = hint(x, y, "Y", 0xFFE0B419, ui.view == View::Store ? tr("instalados") : tr("tienda"));
+        x = hint(x, y, "X", 0xFF2F6FD0, tr("red"));
     }
-    hint(x, y, "B", 0xFFD03A3A, "salir");
+    hint(x, y, "B", 0xFFD03A3A, tr("salir"));
 
     // Espacio libre de cada unidad que existe.
     char space[96] = "";
@@ -758,7 +760,7 @@ void drawStore(Ui& ui, DWORD now)
     const int count = static_cast<int>(ui.games.size());
     if (count == 0) {
         chooseArt(ui, nullptr, now);
-        const char* text = ui.state == Catalog::State::Failed ? ui.message.c_str() : "Cargando la lista de archive.org...";
+        const char* text = ui.state == Catalog::State::Failed ? ui.message.c_str() : tr("Cargando la lista de archive.org...");
         Gfx::text(Gfx::kBody, text, kMargin + 8, kListTopStore + textY,
                   ui.state == Catalog::State::Failed ? kRed : kTextDim);
         return;
@@ -799,14 +801,14 @@ void drawInstalled(Ui& ui, DWORD now)
     const float textY = (kRowHeight - Gfx::lineHeight(Gfx::kBody)) / 2;
     if (!g_drivesReady) {
         chooseArt(ui, nullptr, now);
-        Gfx::text(Gfx::kBody, "Buscando juegos...", kMargin + 8, kListTopInstalled + textY, kTextDim);
+        Gfx::text(Gfx::kBody, tr("Buscando juegos..."), kMargin + 8, kListTopInstalled + textY, kTextDim);
         return;
     }
     int count = 0;
     const Drives::Game* games = Drives::games(&count);
     if (count == 0) {
         chooseArt(ui, nullptr, now);
-        Gfx::text(Gfx::kBody, "No hay juegos en las carpetas de E:, F: ni G:", kMargin + 8, kListTopInstalled + textY,
+        Gfx::text(Gfx::kBody, tr("No hay juegos en las carpetas de E:, F: ni G:"), kMargin + 8, kListTopInstalled + textY,
                   kTextDim);
         return;
     }
@@ -836,7 +838,7 @@ void drawInstalled(Ui& ui, DWORD now)
         if (row < 0) {
             // Titulo de la seccion, con una linea fina hasta el borde.
             char label[48];
-            _snprintf(label, sizeof(label), "%s  (%d)", row == kGamesHeader ? "Juegos" : "Aplicaciones",
+            _snprintf(label, sizeof(label), "%s  (%d)", row == kGamesHeader ? tr("Juegos") : tr("Aplicaciones"),
                       row == kGamesHeader ? gameCount : appCount);
             const float w = Gfx::text(Gfx::kLabel, label, kMargin + 8, y + (kRowHeight - Gfx::lineHeight(Gfx::kLabel)) / 2,
                                       kGreen);
@@ -862,7 +864,7 @@ void drawInstalled(Ui& ui, DWORD now)
     const char* paren = strstr(g.name, " (");
     title.assign(g.name, paren ? paren - g.name : strlen(g.name));
     char where[16];
-    _snprintf(where, sizeof(where), "En %c:", g.drive);
+    _snprintf(where, sizeof(where), tr("En %c:"), g.drive);
     drawDetails(ui, kListTopInstalled, title.c_str(), paren ? paren + 1 : "", where, art);
 }
 
@@ -880,7 +882,7 @@ void drawRecentLog(float y)
         if (!strstr(lines[i], "] http:")) keep[kept++] = lines[i];
     const int room = static_cast<int>((kRuleBottom - 6 - y - 18) / 17);
     if (kept == 0 || room <= 0) return;
-    Gfx::text(Gfx::kSmall, "Registro (E:\\TDATA\\FFFF4358\\cxs_log.txt):", kMargin + 8, y, kTextDim);
+    Gfx::text(Gfx::kSmall, tr("Registro (E:\\TDATA\\FFFF4358\\cxs_log.txt):"), kMargin + 8, y, kTextDim);
     y += 18;
     for (int i = kept > room ? kept - room : 0; i < kept; ++i, y += 17) {
         char fitted[140];
@@ -893,12 +895,12 @@ void drawRecentLog(float y)
 void drawProxyStatus(float y)
 {
     char line[96];
-    if (Settings::proxyCount() == 0) _snprintf(line, sizeof(line), "Proxies: ninguno (directo)");
+    if (Settings::proxyCount() == 0) _snprintf(line, sizeof(line), tr("Proxies: ninguno (directo)"));
     else if (Settings::proxyCount() == 1)
-        _snprintf(line, sizeof(line), "Proxy: %s (%s)", Settings::proxyAt(0), Settings::proxyOn() ? "activo" : "apagado");
+        _snprintf(line, sizeof(line), "Proxy: %s (%s)", Settings::proxyAt(0), Settings::proxyOn() ? tr("activo") : tr("apagado"));
     else
-        _snprintf(line, sizeof(line), "Proxies: %d, el mejor %s (%s)", Settings::proxyCount(), Settings::proxyAt(0),
-                  Settings::proxyOn() ? "activos" : "apagados");
+        _snprintf(line, sizeof(line), tr("Proxies: %d, el mejor %s (%s)"), Settings::proxyCount(), Settings::proxyAt(0),
+                  Settings::proxyOn() ? tr("activos") : tr("apagados"));
     Gfx::textRight(Gfx::kSmall, line, Gfx::kWidth - kMargin - 8, y, Settings::proxyOn() ? kGreen : kTextDim);
 }
 
@@ -913,17 +915,17 @@ float drawRoute()
     if (Route::state() == Route::State::Idle) {
         // Sin buscar todavia en esta sesion: la lista guardada.
         if (Settings::proxyCount() == 0) {
-            Gfx::text(Gfx::kBody, "No hay proxies guardados. Pulsa A para buscar.", kMargin + 8, y + textY, kTextDim);
+            Gfx::text(Gfx::kBody, tr("No hay proxies guardados. Pulsa A para buscar."), kMargin + 8, y + textY, kTextDim);
             return y + kRowHeight + 8;
         }
         for (int i = 0; i < Settings::proxyCount(); ++i, y += kRowHeight) {
             Gfx::text(Gfx::kBody, Settings::proxyAt(i), kMargin + 8, y + textY, kTextList);
-            Gfx::textRight(Gfx::kBody, i == 0 ? "guardado (el mejor)" : "guardado", Gfx::kWidth - kMargin - 8,
+            Gfx::textRight(Gfx::kBody, i == 0 ? tr("guardado (el mejor)") : tr("guardado"), Gfx::kWidth - kMargin - 8,
                            y + textY, Settings::proxyOn() ? kGreen : kTextDim);
         }
         Gfx::text(Gfx::kSmall,
-                  Settings::proxyOn() ? "Activos: la mitad de las conexiones va por ellos y, si uno falla, sigue directa."
-                                      : "Desactivados: todo va directo.",
+                  Settings::proxyOn() ? tr("Activos: la mitad de las conexiones va por ellos y, si uno falla, sigue directa.")
+                                      : tr("Desactivados: todo va directo."),
                   kMargin + 8, y + 4, kTextDim);
         return y + 26;
     }
@@ -933,9 +935,9 @@ float drawRoute()
     for (int i = 0; i < count; ++i, y += kRowHeight) {
         Gfx::text(Gfx::kBody, results[i].label, kMargin + 8, y + textY, kTextList);
         char speed[48];
-        if (!results[i].done) _snprintf(speed, sizeof(speed), "probando...");
-        else if (results[i].speed > 0) _snprintf(speed, sizeof(speed), "%.2f MB/s por conexion", results[i].speed);
-        else _snprintf(speed, sizeof(speed), "no funciona");
+        if (!results[i].done) _snprintf(speed, sizeof(speed), tr("probando..."));
+        else if (results[i].speed > 0) _snprintf(speed, sizeof(speed), tr("%.2f MB/s por conexion"), results[i].speed);
+        else _snprintf(speed, sizeof(speed), tr("no funciona"));
         Gfx::textRight(Gfx::kBody, speed, Gfx::kWidth - kMargin - 8, y + textY,
                        !results[i].done ? kTextDim : results[i].speed > 0 ? kGreen : kRed);
     }
@@ -949,11 +951,11 @@ float drawProbes()
 {
     const float textY = (kRowHeight - Gfx::lineHeight(Gfx::kBody)) / 2;
     const float top = kListTopInstalled;
-    Gfx::text(Gfx::kLabel, "Diagnóstico de red", kMargin + 8, top + textY, kText);
+    Gfx::text(Gfx::kLabel, tr("Diagnóstico de red"), kMargin + 8, top + textY, kText);
     drawProxyStatus(top + textY + 2);
     const int count = g_probeCount;
     if (count == 0) {
-        Gfx::text(Gfx::kBody, g_testRunning ? "Probando..." : "Pulsa A para probar", kMargin + 8,
+        Gfx::text(Gfx::kBody, g_testRunning ? tr("Probando...") : tr("Pulsa A para probar"), kMargin + 8,
                   top + kRowHeight + textY, kTextDim);
         return top + kRowHeight * 2 + 8;
     }
@@ -963,7 +965,7 @@ float drawProbes()
         Gfx::text(Gfx::kBody, p.label, kMargin + 8, y + textY, kTextList);
         unsigned long color = kTextDim;
         const char* result = p.result;
-        if (p.state == ProbeState::Pending) result = "probando...";
+        if (p.state == ProbeState::Pending) result = tr("probando...");
         else if (p.state == ProbeState::Ok) color = kGreen;
         else if (p.state == ProbeState::Failed) color = kRed;
         else color = kText;
@@ -980,26 +982,29 @@ void drawAccount(const Ui& ui)
 {
     const float x = kMargin + 8;
     float y = kListTopInstalled + 6;
-    Gfx::text(Gfx::kTitle, "Cuenta de archive.org", x, y, kText);
+    Gfx::text(Gfx::kTitle, tr("Cuenta de archive.org"), x, y, kText);
     y += 40;
     if (Session::loggedIn()) {
         char line[160];
-        _snprintf(line, sizeof(line), "Sesión iniciada: %s", Session::user()[0] ? Session::user() : "(sin nombre)");
+        _snprintf(line, sizeof(line), tr("Sesión iniciada: %s"), Session::user()[0] ? Session::user() : tr("(sin nombre)"));
         Gfx::text(Gfx::kBody, line, x, y, kGreen);
         y += 24;
         Gfx::text(Gfx::kSmall,
-                  strcmp(Session::source(), "consola") == 0 ? "Iniciada en esta consola (T:\\ia_session.json)."
-                                                            : "Copiada del PC (ia_session.json junto al default.xbe).",
+                  strcmp(Session::source(), "consola") == 0 ? tr("Iniciada en esta consola (T:\\ia_session.json).")
+                                                            : tr("Copiada del PC (ia_session.json junto al default.xbe)."),
                   x, y, kTextDim);
     } else {
-        Gfx::text(Gfx::kBody, "Sin sesión: archive.org no deja bajar los juegos sin ella.", x, y, kRed);
+        Gfx::text(Gfx::kBody, tr("Sin sesión: archive.org no deja bajar los juegos sin ella."), x, y, kRed);
     }
     y += 40;
     wrap(Gfx::kSmall,
-         "Pulsa A para iniciar sesión con tu correo y contraseña de archive.org. La contraseña no se guarda: "
-         "solo la sesión que devuelve archive.org.",
+         tr("Pulsa A para iniciar sesión con tu correo y contraseña de archive.org. La contraseña no se guarda: solo la sesión que devuelve archive.org."),
          x, y, Gfx::kWidth - kMargin * 2 - 16, 3, kTextDim);
     y += 60;
+    char language[96];
+    _snprintf(language, sizeof(language), tr("Idioma: %s  ·  Y para cambiar"), Lang::name(Lang::current()));
+    Gfx::text(Gfx::kBody, language, x, y, kText);
+    y += 34;
     const Session::Login state = Session::loginState();
     if (state != Session::Login::Idle)
         Gfx::text(Gfx::kBody, Session::loginMessage(), x, y,
@@ -1061,32 +1066,32 @@ void drawConfirm(const Ui& ui)
     panel(x, y, w, h);
     const Catalog::Game& g = ui.confirmGame;
     float ty = y + 16;
-    Gfx::text(Gfx::kSmall, "Instalar", x + 20, ty, kGreen);
+    Gfx::text(Gfx::kSmall, tr("Instalar"), x + 20, ty, kGreen);
     ty += 20;
     ty = wrap(Gfx::kTitle, g.title.c_str(), x + 20, ty, w - 40, 2, kText);
     ty += 6;
 
     char line[160], size[24], freeText[24];
     formatSize(g.size, size, sizeof(size));
-    _snprintf(line, sizeof(line), "%s  ·  ZIP de %s", g.region.c_str(), size);
+    _snprintf(line, sizeof(line), tr("%s  ·  ZIP de %s"), g.region.c_str(), size);
     Gfx::text(Gfx::kSmall, line, x + 20, ty, kTextDim);
     ty += 28;
 
     formatSize(static_cast<long long>(driveFree(ui.confirmDrive)), freeText, sizeof(freeText));
-    _snprintf(line, sizeof(line), "<  %c:\\Games  >     libre %s", ui.confirmDrive, freeText);
+    _snprintf(line, sizeof(line), tr("<  %c:\\Games  >     libre %s"), ui.confirmDrive, freeText);
     Gfx::text(Gfx::kBody, line, x + 20, ty, kText);
     ty += 24;
     if (Session::loggedIn()) {
-        _snprintf(line, sizeof(line), "Sesión de archive.org: %s", Session::user()[0] ? Session::user() : "sí");
+        _snprintf(line, sizeof(line), tr("Sesión de archive.org: %s"), Session::user()[0] ? Session::user() : tr("sí"));
         Gfx::text(Gfx::kSmall, line, x + 20, ty, kTextDim);
     } else {
-        wrap(Gfx::kSmall, "Sin sesión de archive.org: pulsa Start para iniciarla aquí mismo", x + 20, ty,
+        wrap(Gfx::kSmall, tr("Sin sesión de archive.org: pulsa Start para iniciarla aquí mismo"), x + 20, ty,
              w - 40, 2, kRed);
     }
 
     const float hy = y + h - 34;
-    float hx = hint(x + 20, hy, "A", 0xFF3FB53F, "instalar");
-    hint(hx, hy, "B", 0xFFD03A3A, "cancelar");
+    float hx = hint(x + 20, hy, "A", 0xFF3FB53F, tr("instalar"));
+    hint(hx, hy, "B", 0xFFD03A3A, tr("cancelar"));
 }
 
 void drawResumePrompt(const Ui& ui)
@@ -1094,22 +1099,22 @@ void drawResumePrompt(const Ui& ui)
     const float x = 100, y = 120, w = Gfx::kWidth - 200, h = 220;
     panel(x, y, w, h);
     float ty = y + 16;
-    Gfx::text(Gfx::kSmall, ui.resumeInfo.installing ? "Tienes una instalacion a medias" : "Tienes una descarga a medias",
+    Gfx::text(Gfx::kSmall, ui.resumeInfo.installing ? tr("Tienes una instalacion a medias") : tr("Tienes una descarga a medias"),
               x + 20, ty, kGreen);
     ty += 20;
     ty = wrap(Gfx::kTitle, ui.resumeInfo.title, x + 20, ty, w - 40, 2, kText) + 6;
     char saved[24], line[160];
     formatSize(ui.resumeInfo.written, saved, sizeof(saved));
-    _snprintf(line, sizeof(line), "Llevas %s guardados  ·  %s", saved, ui.resumeInfo.folder);
+    _snprintf(line, sizeof(line), tr("Llevas %s guardados  ·  %s"), saved, ui.resumeInfo.folder);
     wrap(Gfx::kSmall, line, x + 20, ty, w - 40, 2, kTextDim);
     ty += 40;
     Gfx::text(Gfx::kSmall,
-              ui.resumeInfo.installing ? "Ya esta descargado: solo falta copiar los archivos que faltan."
-                                       : "Se sigue desde el ultimo punto guardado (como mucho se repiten 128 MB).",
+              ui.resumeInfo.installing ? tr("Ya esta descargado: solo falta copiar los archivos que faltan.")
+                                       : tr("Se sigue desde el ultimo punto guardado (como mucho se repiten 128 MB)."),
               x + 20, ty, kTextFaint);
     const float hy = y + h - 34;
-    float hx = hint(x + 20, hy, "A", 0xFF3FB53F, "seguir");
-    hint(hx, hy, "B", 0xFFD03A3A, "descartar");
+    float hx = hint(x + 20, hy, "A", 0xFF3FB53F, tr("seguir"));
+    hint(hx, hy, "B", 0xFFD03A3A, tr("descartar"));
 }
 
 void drawInstall(Ui& ui, const Installer::Progress& p, DWORD now)
@@ -1134,8 +1139,8 @@ void drawInstall(Ui& ui, const Installer::Progress& p, DWORD now)
     if (p.phase == Installer::Phase::Done) color = kGreen;
     if (p.phase == Installer::Phase::Failed) color = kRed;
     if (p.phase == Installer::Phase::Cancelled) color = kTextDim;
-    const char* step = p.phase == Installer::Phase::Downloading  ? "Paso 1 de 2: descargando"
-                       : p.phase == Installer::Phase::Installing ? "Paso 2 de 2: instalando archivos"
+    const char* step = p.phase == Installer::Phase::Downloading  ? tr("Paso 1 de 2: descargando")
+                       : p.phase == Installer::Phase::Installing ? tr("Paso 2 de 2: instalando archivos")
                                                                  : "";
     if (step[0]) {
         Gfx::text(Gfx::kSmall, step, x, y, kGreen);
@@ -1161,7 +1166,7 @@ void drawInstall(Ui& ui, const Installer::Progress& p, DWORD now)
         formatSize(p.done, done, sizeof(done));
         if (p.total > 0) {
             formatSize(p.total, total, sizeof(total));
-            _snprintf(line, sizeof(line), "%s de %s  ·  %d%%", done, total, int(fraction * 100));
+            _snprintf(line, sizeof(line), tr("%s de %s  ·  %d%%"), done, total, int(fraction * 100));
         } else {
             _snprintf(line, sizeof(line), "%s", done);
         }
@@ -1173,8 +1178,8 @@ void drawInstall(Ui& ui, const Installer::Progress& p, DWORD now)
             if (p.total > 0) {
                 const int seconds = int((p.total - p.done) / p.speed);
                 char eta[48];
-                if (seconds >= 3600) _snprintf(eta, sizeof(eta), "  ·  quedan %d h %d min", seconds / 3600, seconds / 60 % 60);
-                else _snprintf(eta, sizeof(eta), "  ·  quedan %d min", seconds / 60 + 1);
+                if (seconds >= 3600) _snprintf(eta, sizeof(eta), tr("  ·  quedan %d h %d min"), seconds / 3600, seconds / 60 % 60);
+                else _snprintf(eta, sizeof(eta), tr("  ·  quedan %d min"), seconds / 60 + 1);
                 strcat(speed, eta);
             }
             Gfx::text(Gfx::kBody, speed, x, y, kTextDim);
@@ -1185,7 +1190,7 @@ void drawInstall(Ui& ui, const Installer::Progress& p, DWORD now)
             }
             if (p.route[0]) {
                 char route[96];
-                _snprintf(route, sizeof(route), "Ruta: %s", p.route);
+                _snprintf(route, sizeof(route), tr("Ruta: %s"), p.route);
                 Gfx::text(Gfx::kSmall, route, x, y, kTextFaint);
                 y += 20;
             }
@@ -1205,11 +1210,11 @@ void drawInstall(Ui& ui, const Installer::Progress& p, DWORD now)
     if (ui.confirmCancel) {
         const float px = 150, py = 180, pw = Gfx::kWidth - 300, ph = 110;
         panel(px, py, pw, ph);
-        Gfx::textCenter(Gfx::kLabel, "¿Cancelar la descarga?", Gfx::kWidth / 2.0f, py + 20, kText);
-        Gfx::textCenter(Gfx::kSmall, "Se borra lo descargado hasta ahora.", Gfx::kWidth / 2.0f, py + 46, kTextDim);
+        Gfx::textCenter(Gfx::kLabel, tr("¿Cancelar la descarga?"), Gfx::kWidth / 2.0f, py + 20, kText);
+        Gfx::textCenter(Gfx::kSmall, tr("Se borra lo descargado hasta ahora."), Gfx::kWidth / 2.0f, py + 46, kTextDim);
         const float hy = py + ph - 32;
-        float hx = hint(px + 60, hy, "A", 0xFF3FB53F, "sí, cancelar");
-        hint(hx, hy, "B", 0xFFD03A3A, "no");
+        float hx = hint(px + 60, hy, "A", 0xFF3FB53F, tr("sí, cancelar"));
+        hint(hx, hy, "B", 0xFFD03A3A, tr("no"));
     }
 }
 
@@ -1228,17 +1233,17 @@ void draw(Ui& ui, DWORD now)
         const bool working = progress.phase == Installer::Phase::Starting ||
                              progress.phase == Installer::Phase::Downloading ||
                              progress.phase == Installer::Phase::Installing;
-        if (working) hint(kMargin, 414, "B", 0xFFD03A3A, "cancelar");
-        else hint(kMargin, 414, "A", 0xFF3FB53F, "volver a la tienda");
+        if (working) hint(kMargin, 414, "B", 0xFFD03A3A, tr("cancelar"));
+        else hint(kMargin, 414, "A", 0xFF3FB53F, tr("volver a la tienda"));
         Gfx::endFrame();
         return;
     }
     char left[96];
     if (ui.view == View::Store) {
         drawStore(ui, now);
-        if (ui.games.empty()) _snprintf(left, sizeof(left), "Letra %s", Catalog::letterLabel(ui.letter));
+        if (ui.games.empty()) _snprintf(left, sizeof(left), tr("Letra %s"), Catalog::letterLabel(ui.letter));
         else if (!ui.message.empty()) _snprintf(left, sizeof(left), "%s", ui.message.c_str());
-        else _snprintf(left, sizeof(left), "%d juegos", static_cast<int>(ui.games.size()));
+        else _snprintf(left, sizeof(left), tr("%d juegos"), static_cast<int>(ui.games.size()));
     } else if (ui.view == View::Installed) {
         drawInstalled(ui, now);
         int count = 0;
@@ -1246,16 +1251,16 @@ void draw(Ui& ui, DWORD now)
         int apps = 0;
         const Drives::Game* games = g_drivesReady ? Drives::games(&count) : nullptr;
         for (int i = 0; i < count; ++i) apps += games[i].app ? 1 : 0;
-        _snprintf(left, sizeof(left), "%d juegos  ·  %d apps", count - apps, apps);
+        _snprintf(left, sizeof(left), tr("%d juegos  ·  %d apps"), count - apps, apps);
         if (ui.launchError[0]) _snprintf(left, sizeof(left), "%s", ui.launchError);
     } else if (ui.view == View::Account) {
         chooseArt(ui, nullptr, now);
-        _snprintf(left, sizeof(left), "Cuenta");
+        _snprintf(left, sizeof(left), tr("Cuenta"));
     } else {
         chooseArt(ui, nullptr, now);
         const float below = ui.proxyPanel ? drawRoute() : drawProbes();
         drawRecentLog(below);
-        _snprintf(left, sizeof(left), ui.proxyPanel ? "Proxies" : "Red");
+        _snprintf(left, sizeof(left), ui.proxyPanel ? "Proxies" : tr("Red"));
     }
     left[sizeof(left) - 1] = 0;
     if (Log::crashText()[0]) _snprintf(left, sizeof(left), "%s", Log::crashText());
@@ -1372,7 +1377,7 @@ void __cdecl main()
                     ui.accountStep = 0;
                 } else if (r == Keyboard::Result::Accepted && ui.accountStep == 1) {
                     ui.loginEmail = ui.keyboard.text();
-                    ui.keyboard.open("Contraseña de archive.org", "", true);
+                    ui.keyboard.open(tr("Contraseña de archive.org"), "", true);
                     ui.accountStep = 2;
                 } else if (r == Keyboard::Result::Accepted) {
                     Session::startLogin(ui.loginEmail.c_str(), ui.keyboard.text().c_str());
@@ -1381,10 +1386,11 @@ void __cdecl main()
                 }
             } else {
                 if ((pressed & kA) && Session::loginState() != Session::Login::Working) {
-                    ui.keyboard.open("Correo de archive.org", ui.loginEmail.c_str(), false);
+                    ui.keyboard.open(tr("Correo de archive.org"), ui.loginEmail.c_str(), false);
                     ui.accountStep = 1;
                 }
                 if ((pressed & kX) && strcmp(Session::source(), "consola") == 0) Session::logout();
+                if (pressed & kY) Settings::setLanguage((Lang::current() + 1) % Lang::kCount);   // se guarda
                 if (pressed & (kB | kStart)) ui.view = ui.beforeAccount;
             }
             pressed = 0;
@@ -1432,12 +1438,12 @@ void __cdecl main()
                 Gfx::beginFrame(0xFF000000);
                 drawBackground(ui);
                 Gfx::textCenter(Gfx::kTitle, g.name, Gfx::kWidth / 2.0f, 210, kText);
-                Gfx::textCenter(Gfx::kBody, "Abriendo...", Gfx::kWidth / 2.0f, 250, kTextDim);
+                Gfx::textCenter(Gfx::kBody, tr("Abriendo..."), Gfx::kWidth / 2.0f, 250, kTextDim);
                 Gfx::endFrame();
                 Gfx::persist();
                 XLaunchNewImage(xbe, NULL);
                 // Solo se llega aqui si no arranco.
-                _snprintf(ui.launchError, sizeof(ui.launchError), "No se pudo abrir %s", g.name);
+                _snprintf(ui.launchError, sizeof(ui.launchError), tr("No se pudo abrir %s"), g.name);
                 Log::write("abrir: fallo (%lu)", GetLastError());
             }
         } else if (ui.view == View::Network && ui.proxyPanel) {
@@ -1445,11 +1451,11 @@ void __cdecl main()
             if ((pressed & kA) && Route::state() != Route::State::Searching) Route::startSearch();
             if (pressed & kY) {
                 if (Settings::proxyCount() == 0) {
-                    _snprintf(ui.toast, sizeof(ui.toast), "No hay proxies guardados: pulsa A para buscar");
+                    _snprintf(ui.toast, sizeof(ui.toast), tr("No hay proxies guardados: pulsa A para buscar"));
                 } else {
                     Settings::setProxyOn(!Settings::proxyOn());
-                    _snprintf(ui.toast, sizeof(ui.toast), Settings::proxyOn() ? "Proxies activados (%d)"
-                                                                             : "Proxies desactivados: todo directo",
+                    _snprintf(ui.toast, sizeof(ui.toast), Settings::proxyOn() ? tr("Proxies activados (%d)")
+                                                                             : tr("Proxies desactivados: todo directo"),
                               Settings::proxyCount());
                 }
                 ui.toastUntil = now + 3000;

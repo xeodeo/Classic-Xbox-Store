@@ -1,5 +1,7 @@
 #include "store/Session.h"
 
+#include "ui/Lang.h"
+
 #include "XboxXtl.h"
 #include "net/Http.h"
 #include "store/Catalog.h"
@@ -119,8 +121,8 @@ DWORD WINAPI loginThread(void*)
     if (!ok) {
         // Con datos que no valen, archive.org responde 401.
         Log::write("sesion: no se pudo iniciar (HTTP %d, %s)", response.status, error);
-        setLogin(Session::Login::Failed, response.status == 401 ? "Correo o contraseña incorrectos"
-                                                                 : "No se pudo conectar con archive.org");
+        setLogin(Session::Login::Failed, response.status == 401 ? tr("Correo o contraseña incorrectos")
+                                                                 : tr("No se pudo conectar con archive.org"));
         return 0;
     }
     const std::string reply(reinterpret_cast<char*>(data), length);
@@ -128,7 +130,7 @@ DWORD WINAPI loginThread(void*)
     const std::string cookies = cookiesFrom(reply);
     if (reply.find("\"success\":true") == std::string::npos || cookies.find("logged-in-sig=") == std::string::npos) {
         Log::write("sesion: respuesta sin cookies");
-        setLogin(Session::Login::Failed, "archive.org no devolvio la sesion");
+        setLogin(Session::Login::Failed, tr("archive.org no devolvio la sesion"));
         return 0;
     }
     // Mismo formato que el ia_session.json de Classic Xbox Loader.
@@ -142,13 +144,13 @@ DWORD WINAPI loginThread(void*)
     const std::string file = "{\"logged_in\": true, \"username\": \"" + (screenName.empty() ? email : screenName) +
                              "\", \"cookies\": " + cookieObject + "}";
     if (!Files::writeDurable(kConsolePath, file.data(), file.size())) {
-        setLogin(Session::Login::Failed, "No se pudo guardar la sesion en el disco");
+        setLogin(Session::Login::Failed, tr("No se pudo guardar la sesion en el disco"));
         return 0;
     }
     load();
     Log::write("sesion: iniciada como %s", s_user.c_str());
     char message[160];
-    _snprintf(message, sizeof(message), "Sesion iniciada: %s", s_user.c_str());
+    _snprintf(message, sizeof(message), tr("Sesion iniciada: %s"), s_user.c_str());
     setLogin(Session::Login::Ok, message);
     return 0;
 }
@@ -193,10 +195,10 @@ void startLogin(const char* email, const char* password)
         s_loginEmail = email;
         s_loginPassword = password;
     }
-    setLogin(Login::Working, "Iniciando sesion en archive.org...");
+    setLogin(Login::Working, tr("Iniciando sesion en archive.org..."));
     HANDLE h = CreateThread(NULL, 256 * 1024, loginThread, NULL, 0, NULL);
     if (h) CloseHandle(h);
-    else setLogin(Login::Failed, "No se pudo iniciar sesion");
+    else setLogin(Login::Failed, tr("No se pudo iniciar sesion"));
 }
 
 Login loginState()

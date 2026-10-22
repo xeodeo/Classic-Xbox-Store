@@ -1,6 +1,7 @@
 #include "ui/Keyboard.h"
 
 #include "ui/Gfx.h"
+#include "ui/Lang.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -105,10 +106,10 @@ void Keyboard::draw() const
         const float x = x0 + c * (specialW + kGap), y = y0 + 4 * (kKeyH + kGap);
         const bool focus = m_row == 4 && c == m_column;
         Gfx::roundRect(x, y, specialW, kKeyH, 6, focus ? kKeyFocus : kKey, focus ? 0xFF1E7E1E : kKey);
-        Gfx::textCenter(Gfx::kBody, kSpecial[c], x + specialW / 2, y + (kKeyH - Gfx::lineHeight(Gfx::kBody)) / 2, kText);
+        Gfx::textCenter(Gfx::kBody, tr(kSpecial[c]), x + specialW / 2, y + (kKeyH - Gfx::lineHeight(Gfx::kBody)) / 2, kText);
     }
 
-    const char* help = m_secret ? "A escribir   X borrar   Y mayusculas   Back ver   Start aceptar   B cancelar"
-                                : "A escribir   X borrar   Y mayusculas   Start aceptar   B cancelar";
+    const char* help = m_secret ? tr("A escribir   X borrar   Y mayusculas   Back ver   Start aceptar   B cancelar")
+                                : tr("A escribir   X borrar   Y mayusculas   Start aceptar   B cancelar");
     Gfx::textCenter(Gfx::kSmall, help, Gfx::kWidth / 2.0f, y0 + 5 * (kKeyH + kGap) + 10, kTextDim);
 }
