@@ -872,24 +872,35 @@ DWORD WINAPI fetchWorker(void* param)
         unsigned char* buffer = static_cast<unsigned char*>(malloc(length));
         bool ok = buffer != nullptr;
         char error[160] = "sin memoria";
-        for (int attempt = 1; ok && attempt <= 10 && !f.stop && !s_cancel; ++attempt) {
+        // Los fallos por un proxy no gastan los 10 intentos: con varios proxies
+        // muertos, la conexion tiene que llegar a ir directa antes de rendirse.
+        for (int attempt = 0; ok && !f.stop && !s_cancel;) {
             if (client.fetch(f.url.c_str(), f.headers.c_str(), start, length, buffer, error, sizeof(error))) break;
-            Log::write("instalar: trozo %I64d, intento %d: %s", segment, attempt, error);
-            if (proxy >= 0 && ++proxyFailures >= 2) {
-                // Este proxy no sirve: probar el siguiente de la lista; si ya se
-                // probaron todos, seguir directa.
-                proxyFailures = 0;
-                if (++proxiesTried < proxyCount) {
-                    proxy = (proxy + 1) % proxyCount;
-                    client.setProxy(f.proxies[proxy].c_str());
-                    Log::write("instalar: conexion %d pasa al proxy %s", index, f.proxies[proxy].c_str());
-                } else {
-                    proxy = -1;
-                    client.setProxy("");
-                    Log::write("instalar: conexion %d: ningun proxy sirve, sigue directa", index);
+            if (proxy >= 0) {
+                Log::write("instalar: trozo %I64d por el proxy %s: %s", segment, f.proxies[proxy].c_str(), error);
+                if (++proxyFailures >= 2) {
+                    // Este proxy no sirve: el siguiente de la lista; si ya se probaron
+                    // todos, directa.
+                    proxyFailures = 0;
+                    if (++proxiesTried < proxyCount) {
+                        proxy = (proxy + 1) % proxyCount;
+                        client.setProxy(f.proxies[proxy].c_str());
+                        Log::write("instalar: conexion %d pasa al proxy %s", index, f.proxies[proxy].c_str());
+                    } else {
+                        proxy = -1;
+                        client.setProxy("");
+                        Log::write("instalar: conexion %d: ningun proxy sirve, sigue directa", index);
+                    }
                 }
+                for (int i = 0; i < 5 && !f.stop && !s_cancel; ++i) Sleep(100);
+                continue;
             }
-            if (attempt == 10) ok = false;
+            ++attempt;
+            Log::write("instalar: trozo %I64d, intento %d: %s", segment, attempt, error);
+            if (attempt == 10) {
+                ok = false;
+                break;
+            }
             for (int i = 0; i < attempt * 10 && !f.stop && !s_cancel; ++i) Sleep(100);
         }
         if (!ok || f.stop || s_cancel) {
