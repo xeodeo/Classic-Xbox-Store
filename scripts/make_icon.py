@@ -25,11 +25,11 @@ OUTPUT_DIR = os.path.join(ROOT_DIR, "assets", "icon")
 # Vector geometry for S in STORE:
 # Crafted to match the exact chamfer angles, stroke weight (6.6), and squircle
 # grammar of the 2001 Xbox wordmark (letters X, B, O, X).
+# Barra arriba, bajada a la izquierda, barra en medio, bajada a la derecha y
+# barra abajo: la version anterior cortaba el trazo de abajo y se leia "E".
 S_PATH = (
-    "M 33 9.0 V 6.5 L 26.5 0 H 6.5 L 0 6.5 V 12.0 L 6.5 14.5 H 24.0 "
-    "L 33 17.0 V 18.2 L 26.5 24.7 H 6.5 L 0 18.2 V 15.7 H 6.6 V 18.1 "
-    "L 9.0 19.5 H 24.0 L 26.4 18.1 V 17.0 L 20.0 10.0 H 6.6 V 6.6 "
-    "L 9.0 5.2 H 24.0 L 26.4 6.6 V 9.0 Z"
+    "M 6 0 H 33 V 5 H 5.5 V 9.85 H 28 L 33 14.85 V 18.7 L 27 24.7 "
+    "H 0 V 19.7 H 27.5 V 14.85 H 5 L 0 9.85 V 6 Z"
 )
 
 # Complete 1024x1024 Master SVG Artwork
