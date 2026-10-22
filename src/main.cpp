@@ -677,7 +677,7 @@ void drawFooter(const Ui& ui, const char* left)
     fit(Gfx::kBody, left, 150, fitted, sizeof(fitted));
     Gfx::text(Gfx::kBody, fitted, kMargin, y, kText);
 
-    float x = ui.view == View::Store ? 150 : 196;
+    float x = 150;
     if (ui.view == View::Network && ui.proxyPanel) {
         x = 110;
         if (Route::state() != Route::State::Searching) x = hint(x, y, "A", 0xFF3FB53F, tr("buscar"));
@@ -703,8 +703,9 @@ void drawFooter(const Ui& ui, const char* left)
         if (ui.view == View::Installed) x = hint(x, y, "A", 0xFF3FB53F, tr("abrir"));
         x = hint(x, y, "Y", 0xFFE0B419, ui.view == View::Store ? tr("instalados") : tr("tienda"));
         x = hint(x, y, "X", 0xFF2F6FD0, tr("red"));
+        x = hint(x, y, "Start", 0xFF707070, tr("cuenta"));
     }
-    hint(x, y, "B", 0xFFD03A3A, tr("salir"));
+    x = hint(x, y, "B", 0xFFD03A3A, tr("salir"));
 
     // Espacio libre de cada unidad que existe.
     char space[96] = "";
@@ -719,7 +720,9 @@ void drawFooter(const Ui& ui, const char* left)
             strcat(space, part);
         }
     }
-    Gfx::textRight(Gfx::kSmall, space, Gfx::kWidth - kMargin, y + 2, kTextDim);
+    // Solo si cabe: los botones van primero.
+    if (x + Gfx::textWidth(Gfx::kSmall, space) < Gfx::kWidth - kMargin)
+        Gfx::textRight(Gfx::kSmall, space, Gfx::kWidth - kMargin, y + 2, kTextDim);
 }
 
 // --- vista Tienda ----------------------------------------------------------------------

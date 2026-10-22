@@ -52,6 +52,7 @@ TEXTS = {
     "iniciar sesión": ("sign in", "entrar"),
     "cerrar sesión": ("sign out", "sair da conta"),
     "idioma": ("language", "idioma"),
+    "cuenta": ("account", "conta"),
     "instalar": ("install", "instalar"),
     "abrir": ("open", "abrir"),
     "instalados": ("installed", "instalados"),

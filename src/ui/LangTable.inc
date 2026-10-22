@@ -150,6 +150,7 @@
 {"cerrar sesión", "sign out", "sair da conta"},
 {"conecta  (%lu ms)", "connects  (%lu ms)", "conecta  (%lu ms)"},
 {"cortada por el otro lado", "reset by the other side", "cortada pelo outro lado"},
+{"cuenta", "account", "conta"},
 {"desactivar", "turn off", "desativar"},
 {"descartar", "discard", "descartar"},
 {"directo", "direct", "direto"},
